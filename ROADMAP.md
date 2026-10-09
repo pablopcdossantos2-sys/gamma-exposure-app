@@ -110,6 +110,26 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 - qualidade dos dados;
 - nenhuma linguagem de certeza, sinal ou recomendação.
 
+
+### C5 — Indicadores de preço como confluência opcional
+**Status:** implementado.
+
+- ATR(14), RSI(14) e Bollinger(20, 2σ);
+- seleção entre EWZ e WIN1!;
+- indicadores calculados somente a partir dos candles;
+- camada independente do cálculo de opções;
+- nenhum efeito sobre GEX, Walls, Flip, Stress Lab ou scorecards.
+
+### D1 — OI-weighted × Volume-weighted Gamma
+**Status:** implementado.
+
+- GEX por open interest permanece o modelo estrutural principal;
+- proxy separado de atividade gamma ponderado pelo volume da sessão;
+- totais, strikes dominantes e correlação por strike;
+- perfis normalizados para comparar a forma sem misturar escalas;
+- contratos com OI zero podem contribuir para atividade por volume;
+- OI e volume nunca são somados como se representassem a mesma grandeza.
+
 ### D2 — Replay reproduzível / recibo de análise
 - snapshot, versão, expiry, parâmetros e resultados;
 - replay e exportação JSON.
@@ -118,8 +138,6 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 - todas as principais seções possuem ajuda contextual;
 - pop-up com o que mostra, como interpretar e limitações;
 - catálogo reutilizável em `docs/help.js`.
-
----
 
 ---
 
