@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",chartViews:{ewz:null,win:null},compareA:null,compareB:null};
+var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null};
 var dragState=null,dragRAF=null;
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -48,6 +48,15 @@ function activeGex(){
   if(!p)return state.gex;
   return Object.assign({},state.gex,p,{expiry_profiles:state.gex.expiry_profiles,generated_at:state.gex.generated_at,symbol:state.gex.symbol,demo:state.gex.demo})
 }
+function structureProfile(){
+  if(!state.gex||!Array.isArray(state.gex.expiry_profiles)||!state.gex.expiry_profiles.length)return null;
+  if(state.expiryFilter!=="all"){
+    return state.gex.expiry_profiles.find(function(p){return p.expiration===state.expiryFilter})||null
+  }
+  return state.gex.expiry_profiles.slice().sort(function(a,b){return (a.dte||0)-(b.dte||0)})[0]
+}
+function metricLabel(metric){return metric==="dex"?"DEX":metric==="vanna"?"Vanna":"Charm"}
+function metricColor(metric){return metric==="dex"?cssVar("--cyan"):metric==="vanna"?cssVar("--purple"):cssVar("--green")}
 function niceTicks(min,max,n){var span=max-min||1,step=Math.pow(10,Math.floor(Math.log10(span/n))),err=span/n/step;step*=err>=7.5?10:err>=3.5?5:err>=1.5?2:1;var out=[],v=Math.ceil(min/step)*step;for(;v<=max+step*1e-6;v+=step)out.push(Math.abs(v)<step*1e-9?0:v);return out}
 function compact(v){var a=Math.abs(v),s=v<0?"−":"";if(a>=1e9)return s+fmt2.format(a/1e9)+" bi";if(a>=1e6)return s+fmt2.format(a/1e6)+" mi";if(a>=1e3)return s+fmt0.format(a/1e3)+" mil";return s+fmt0.format(a)}
 var tip=$("tip");
@@ -56,14 +65,18 @@ function hideTip(){tip.hidden=true}
 function legend(id,items){var box=$(id);box.innerHTML="";items.forEach(function(it){var s=document.createElement("span"),i=document.createElement("i");i.style.background=it.color;if(it.cls)i.className=it.cls;if(it.dash){i.className="dash";i.style.color=it.color} s.appendChild(i);s.appendChild(document.createTextNode(it.name));box.appendChild(s)})}
 
 function levelRows(){
-  var d=activeGex();
-  return[
+  var d=activeGex(),s=structureProfile();
+  var rows=[
     {name:"Call Wall",v:d.call_wall,color:cssVar("--blue"),note:"Maior GEX de calls; resistência/oferta potencial."},
     {name:"Gamma Flip",v:d.flip,color:cssVar("--purple"),note:"Divisor entre regime de gamma positivo e negativo."},
     {name:"Preço EWZ do GEX",v:d.spot,color:cssVar("--text"),note:"Preço de referência usado no cálculo do GEX."},
     {name:"Put Wall",v:d.put_wall,color:cssVar("--orange"),note:"Maior magnitude de GEX de puts; suporte/demanda potencial."},
     {name:"Maior |GEX|",v:d.max_abs_strike,color:cssVar("--cyan"),note:"Strike com maior GEX líquido absoluto."}
-  ]
+  ];
+  if(s&&s.max_pain!=null)rows.push({name:"Max Pain",v:s.max_pain,color:cssVar("--axis"),note:"Strike que minimiza o payout intrínseco agregado no vencimento de referência."});
+  if(s&&s.expected_low!=null)rows.push({name:"Expected Move −",v:s.expected_low,color:cssVar("--cyan"),note:"Limite inferior do expected move do vencimento de referência."});
+  if(s&&s.expected_high!=null)rows.push({name:"Expected Move +",v:s.expected_high,color:cssVar("--cyan"),note:"Limite superior do expected move do vencimento de referência."});
+  return rows
 }
 function regime(d){if(d.flip==null)return d.net_gex>=0?"Gamma líquido positivo":"Gamma líquido negativo";return d.spot>=d.flip?"EWZ acima do Flip · gamma positivo":"EWZ abaixo do Flip · gamma negativo"}
 function renderHeader(){
@@ -316,6 +329,114 @@ function renderComparison(){
   ks.forEach(function(k,i){var hit=svgEl("rect",{x:x(i)-step/2,y:m.t,width:Math.max(8,step),height:H-m.t-m.b,class:"hit"},svg);hit.addEventListener("pointermove",function(e){showTip(e,"Strike "+fmt2.format(k),[["A",usd(mapA[k]||0)],["B",usd(mapB[k]||0)],["Δ B−A",usd((mapB[k]||0)-(mapA[k]||0))]])});hit.addEventListener("pointerleave",hideTip)})
 }
 
+
+function renderStructure(){
+  var p=structureProfile(),box=$("structureKpis"),scale=$("structureScale"),badge=$("structureExpiryBadge"),note=$("structureNote");
+  if(!box||!scale)return;
+  box.innerHTML="";scale.innerHTML="";
+  if(!p||p.max_pain==null||p.expected_move==null){
+    badge.textContent="sem dados A4";
+    note.textContent="Este snapshot foi criado antes das métricas de Max Pain/Expected Move ou não possui quotes suficientes. Novas coletas passam a armazenar esses valores.";
+    return
+  }
+  var expLabel=new Date(p.expiration+"T12:00:00").toLocaleDateString("pt-BR");
+  badge.textContent=expLabel+" · "+p.dte+" DTE";
+  var metrics=[
+    ["Max Pain","US$ "+fmt2.format(p.max_pain),"WIN "+(toWin(p.max_pain)==null?"—":fmt0.format(toWin(p.max_pain)))],
+    ["Expected Move","± US$ "+fmt2.format(p.expected_move),fmt2.format(p.expected_move_pct||0)+"% do spot"],
+    ["Faixa EWZ","US$ "+fmt2.format(p.expected_low)+" – "+fmt2.format(p.expected_high),"ATM "+fmt2.format(p.atm_strike||p.spot)],
+    ["Faixa WIN",toWin(p.expected_low)==null?"—":fmt0.format(toWin(p.expected_low))+" – "+fmt0.format(toWin(p.expected_high)),"projeção EWZ → WIN"]
+  ];
+  metrics.forEach(function(m){var d=document.createElement("div");d.className="structure-kpi";var a=document.createElement("span");a.textContent=m[0];var b=document.createElement("strong");b.textContent=m[1];var s=document.createElement("small");s.textContent=m[2];d.appendChild(a);d.appendChild(b);d.appendChild(s);box.appendChild(d)});
+  var vals=[p.expected_low,p.expected_high,p.max_pain,p.spot,p.call_wall,p.put_wall].filter(function(v){return v!=null});
+  var lo=Math.min.apply(null,vals),hi=Math.max.apply(null,vals),pad=(hi-lo)*.08||.5;lo-=pad;hi+=pad;
+  var W=1000,H=100,m={l:38,r:38,t:18,b:28},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Expected Move e Max Pain"},scale);
+  var x=function(v){return m.l+(v-lo)/(hi-lo)*(W-m.l-m.r)};
+  svgEl("line",{x1:m.l,x2:W-m.r,y1:48,y2:48,stroke:cssVar("--axis"),"stroke-width":2},svg);
+  svgEl("rect",{x:x(p.expected_low),y:34,width:Math.max(2,x(p.expected_high)-x(p.expected_low)),height:28,rx:8,fill:cssVar("--cyan"),"fill-opacity":.15},svg);
+  [
+    ["EM−",p.expected_low,cssVar("--cyan")],["Put",p.put_wall,cssVar("--orange")],["Spot",p.spot,cssVar("--text")],
+    ["Max Pain",p.max_pain,cssVar("--axis")],["Call",p.call_wall,cssVar("--blue")],["EM+",p.expected_high,cssVar("--cyan")]
+  ].forEach(function(it,i){if(it[1]==null)return;var xx=x(it[1]);svgEl("line",{x1:xx,x2:xx,y1:26,y2:70,stroke:it[2],"stroke-width":it[0]==="Spot"?2:1.4,"stroke-dasharray":it[0]==="Max Pain"?"4 3":""},svg);svgText(svg,xx,i%2?84:18,it[0]+" "+fmt2.format(it[1]),{"text-anchor":"middle",class:"lbl",style:"fill:"+it[2]})});
+  note.textContent=(p.expected_move_source==="atm_straddle_mid"?"Expected Move pelo straddle ATM (mid call + mid put).":"Expected Move pelo fallback de IV ATM (1σ).")+" Max Pain minimiza o payout intrínseco agregado naquele vencimento; é referência estrutural, não previsão."
+}
+
+function renderAdvanced(){
+  var d=activeGex(),box=$("advancedKpis"),host=$("advancedExposureChart");
+  if(!box||!host)return;box.innerHTML="";host.innerHTML="";
+  if(d.net_dex==null||!d.strikes||!d.strikes.some(function(s){return s.dex!=null})){
+    box.innerHTML='<p class="note">Este snapshot ainda não possui DEX/Vanna/Charm. As novas coletas passam a armazenar essas exposições.</p>';return
+  }
+  [
+    ["Net DEX",usd(d.net_dex),"notional delta"],
+    ["Net Vanna",usd(d.net_vanna),"por +1 vol point"],
+    ["Net Charm",usd(d.net_charm),"por 1 dia decorrido"]
+  ].forEach(function(m){var k=document.createElement("div");k.className="advanced-kpi";var a=document.createElement("span");a.textContent=m[0];var b=document.createElement("strong");b.textContent=m[1];var s=document.createElement("small");s.textContent=m[2];k.appendChild(a);k.appendChild(b);k.appendChild(s);box.appendChild(k)});
+  var metric=state.advancedMetric,lo=d.spot*(1-state.range),hi=d.spot*(1+state.range),rows=d.strikes.filter(function(s){return s.k>=lo&&s.k<=hi});
+  if(!rows.length)return;
+  var W=1220,H=330,m={l:78,r:18,t:24,b:48},vmax=Math.max.apply(null,rows.map(function(s){return Math.abs(s[metric]||0)}))*1.12||1;
+  var svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":metricLabel(metric)+" por strike"},host);
+  var x=function(i){return m.l+i/Math.max(1,rows.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v+vmax)/(2*vmax))*(H-m.t-m.b)};
+  niceTicks(-vmax,vmax,6).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:t===0?"axis":"grid"},svg);svgText(svg,m.l-9,y(t)+4,compact(t),{"text-anchor":"end"})});
+  var step=(W-m.l-m.r)/Math.max(1,rows.length-1),bw=Math.max(4,Math.min(22,step*.56)),col=metricColor(metric);
+  rows.forEach(function(s,i){var v=s[metric]||0,yy=y(v);svgEl("rect",{x:x(i)-bw/2,y:Math.min(y(0),yy),width:bw,height:Math.max(1,Math.abs(yy-y(0))),fill:col,"fill-opacity":.72,rx:2},svg)});
+  var every=Math.max(1,Math.ceil(rows.length/10));rows.forEach(function(s,i){if(i%every===0||i===rows.length-1)svgText(svg,x(i),H-m.b+17,fmt2.format(s.k),{"text-anchor":"middle"})});
+  rows.forEach(function(s,i){var hit=svgEl("rect",{x:x(i)-step/2,y:m.t,width:Math.max(8,step),height:H-m.t-m.b,class:"hit"},svg);hit.addEventListener("pointermove",function(e){showTip(e,"Strike "+fmt2.format(s.k),[[metricLabel(metric),usd(s[metric]||0)],["DEX",usd(s.dex||0)],["Vanna",usd(s.vanna||0)],["Charm",usd(s.charm||0)]])});hit.addEventListener("pointerleave",hideTip)});
+  legend("advancedLegend",[{name:metricLabel(metric)+" net por strike",color:col,cls:"sq"},{name:"positivo",color:col},{name:"negativo",color:cssVar("--axis")}])
+}
+
+function renderTimeMapControls(){
+  var sel=$("timeMapDateSelect");if(!sel)return;
+  var dates=[];snapshotEntries().forEach(function(e){if(dates.indexOf(e.local_date)<0)dates.push(e.local_date)});dates.sort().reverse();
+  var keep=sel.value,current=currentSnapshotEntry(),preferred=current?current.local_date:(dates[0]||"");
+  sel.innerHTML="";dates.forEach(function(d){var o=document.createElement("option");o.value=d;o.textContent=new Date(d+"T12:00:00").toLocaleDateString("pt-BR");sel.appendChild(o)});
+  sel.value=dates.indexOf(keep)>=0?keep:preferred;
+  if(sel.value)loadTimeMapDay(sel.value)
+}
+function loadTimeMapDay(day){
+  var host=$("timeStrikeHeatmap");if(!host)return;
+  if(state.timeMapCache[day]){renderTimeMap(day);return}
+  if(state.timeMapLoading===day)return;
+  state.timeMapLoading=day;host.innerHTML='<p class="note heatmap-empty">Carregando snapshots do dia…</p>';
+  var entries=snapshotEntries().filter(function(e){return e.local_date===day}).sort(function(a,b){return a.local_time.localeCompare(b.local_time)});
+  Promise.all(entries.map(function(e){return getJson(e.file).then(function(d){return{entry:e,data:d}}).catch(function(){return null})}))
+    .then(function(rows){state.timeMapCache[day]=rows.filter(Boolean);renderTimeMap(day)})
+    .finally(function(){state.timeMapLoading=null})
+}
+function temporalProfile(snap){
+  if(state.expiryFilter==="all")return snap;
+  if(!Array.isArray(snap.expiry_profiles))return null;
+  return snap.expiry_profiles.find(function(p){return p.expiration===state.expiryFilter})||null
+}
+function renderTimeMap(day){
+  var host=$("timeStrikeHeatmap");if(!host)return;host.innerHTML="";
+  var rows=state.timeMapCache[day]||[];
+  if(!rows.length){host.innerHTML='<p class="note heatmap-empty">Sem snapshots carregáveis para este dia.</p>';return}
+  var usable=rows.map(function(r){return{entry:r.entry,p:temporalProfile(r.data)}}).filter(function(r){return r.p&&Array.isArray(r.p.strikes)});
+  if(!usable.length){host.innerHTML='<p class="note heatmap-empty">O vencimento selecionado não está disponível nos snapshots deste dia.</p>';return}
+  var center=usable[usable.length-1].p.spot,lo=center*(1-state.range),hi=center*(1+state.range),strikeSet={},maxAbs=1;
+  usable.forEach(function(r){r.map={};r.p.strikes.forEach(function(s){if(s.k>=lo&&s.k<=hi){strikeSet[s.k]=true;r.map[s.k]=s;maxAbs=Math.max(maxAbs,Math.abs(s.net||0))}})});
+  var strikes=Object.keys(strikeSet).map(Number).sort(function(a,b){return b-a});
+  if(!strikes.length){host.innerHTML='<p class="note heatmap-empty">Sem strikes na faixa atual.</p>';return}
+  var cellW=Math.max(34,Math.min(58,1000/usable.length)),cellH=21,m={l:68,r:14,t:78,b:22},W=Math.max(940,m.l+m.r+usable.length*cellW),H=m.t+m.b+strikes.length*cellH;
+  var svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,width:W,height:H,role:"img","aria-label":"Mapa temporal de GEX por strike"},host);
+  usable.forEach(function(r,ci){
+    var xx=m.l+ci*cellW,opening=r.entry.is_win_open_reference;
+    if(opening)svgEl("rect",{x:xx,y:m.t-32,width:cellW,height:strikes.length*cellH+34,fill:cssVar("--purple"),"fill-opacity":.055},svg);
+    var lab=(opening?"★ ":"")+r.entry.local_time.slice(0,5),tx=xx+cellW/2,t=svgText(svg,tx,m.t-9,lab,{"text-anchor":"end",class:"heat-label"});t.setAttribute("transform","rotate(-55 "+tx+" "+(m.t-9)+")")
+  });
+  strikes.forEach(function(k,ri){
+    var yy=m.t+ri*cellH;svgText(svg,m.l-8,yy+cellH*.68,fmt2.format(k),{"text-anchor":"end",class:"lbl"});
+    usable.forEach(function(r,ci){
+      var s=r.map[k]||{net:0},v=s.net||0,str=Math.abs(v)/maxAbs,color=v>0?cssVar("--blue"):v<0?cssVar("--orange"):cssVar("--grid"),op=v===0?.06:.12+.78*str;
+      var rect=svgEl("rect",{x:m.l+ci*cellW+1,y:yy+1,width:cellW-2,height:cellH-2,rx:2,fill:color,"fill-opacity":op.toFixed(3),stroke:cssVar("--border"),"stroke-width":.4},svg);
+      if(k===r.p.call_wall)rect.setAttribute("stroke",cssVar("--blue")),rect.setAttribute("stroke-width","2");
+      if(k===r.p.put_wall)rect.setAttribute("stroke",cssVar("--orange")),rect.setAttribute("stroke-width","2");
+      rect.addEventListener("pointermove",function(e){showTip(e,r.entry.local_time.slice(0,5)+" · Strike "+fmt2.format(k),[["GEX",usd(v)],["Call Wall",r.p.call_wall===k?"sim":"não"],["Put Wall",r.p.put_wall===k?"sim":"não"]])});rect.addEventListener("pointerleave",hideTip)
+    })
+  })
+}
+
 function gammaZones(mapper){
   var d=activeGex(),rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
   for(var i=1;i<rows.length;i++)gap=Math.min(gap,rows[i].k-rows[i-1].k);if(!isFinite(gap))gap=.5;
@@ -443,6 +564,11 @@ function priceChart(id,key,mapper,legendId){
   }
   zones.forEach(function(z){if(!z.center||z.hi<ymin||z.lo>ymax)return;var top=y(Math.min(ymax,z.hi)),bot=y(Math.max(ymin,z.lo));svgEl("rect",{x:m.l,y:top,width:plotW,height:Math.max(1,bot-top),fill:z.positive?cssVar("--blue"):cssVar("--orange"),"fill-opacity":zoneOpacity(z)},plot)});
   relevant.forEach(function(k){if(k.v<ymin||k.v>ymax)return;var yy=y(k.v),dash=k.name==="Gamma Flip"?"7 4":"4 3";svgEl("line",{x1:m.l,x2:W-m.r,y1:yy,y2:yy,stroke:k.color,"stroke-width":k.name==="Gamma Flip"?2:1.4,"stroke-dasharray":dash},plot);svgText(svg,W-m.r+7,yy+4,k.name.replace("Preço EWZ do GEX","GEX spot")+" "+(key==="win"?fmt0.format(k.v):fmt2.format(k.v)),{class:"lbl",style:"fill:"+k.color})});
+  if(state.advancedOverlay!=="none"){
+    var gd=activeGex(),metric=state.advancedOverlay,col=metricColor(metric);
+    var tops=(gd.strikes||[]).filter(function(s){return s[metric]!=null}).sort(function(a,b){return Math.abs(b[metric])-Math.abs(a[metric])}).slice(0,3);
+    tops.forEach(function(s,idx){var lv=mapper(s.k);if(lv==null||lv<ymin||lv>ymax)return;var yy=y(lv);svgEl("line",{x1:m.l,x2:W-m.r,y1:yy,y2:yy,stroke:col,"stroke-width":1.2,"stroke-dasharray":"2 5","stroke-opacity":.8},plot);svgText(svg,W-m.r+7,yy-4,metricLabel(metric)+" #"+(idx+1)+" "+(key==="win"?fmt0.format(lv):fmt2.format(lv)),{class:"lbl",style:"fill:"+col})})
+  }
   var step=plotW/Math.max(1,bars.length-1),bw=Math.max(2,Math.min(10,step*.62));
   bars.forEach(function(b,i){var xx=x(i),up=b.c>=b.o,col=up?cssVar("--green"):cssVar("--red");svgEl("line",{x1:xx,x2:xx,y1:y(b.h),y2:y(b.l),stroke:col,"stroke-width":1},plot);var top=y(Math.max(b.o,b.c)),bot=y(Math.min(b.o,b.c));svgEl("rect",{x:xx-bw/2,y:top,width:bw,height:Math.max(1,bot-top),fill:col,rx:.7},plot)});
   var multi=new Date(bars[0].t*1000).toDateString()!==new Date(bars[bars.length-1].t*1000).toDateString();
@@ -478,10 +604,11 @@ function priceChart(id,key,mapper,legendId){
   var legendItems=[{name:"Alta",color:cssVar("--green"),cls:"sq"},{name:"Baixa",color:cssVar("--red"),cls:"sq"}];
   if(showZones){legendItems.push({name:"Faixas GEX +",color:cssVar("--blue"),cls:"sq"},{name:"Faixas GEX −",color:cssVar("--orange"),cls:"sq"})}
   if(showLevels){legendItems.push({name:"Gamma Flip / níveis",color:cssVar("--purple"),dash:true})}
+  if(state.advancedOverlay!=="none"){legendItems.push({name:"Top "+metricLabel(state.advancedOverlay),color:metricColor(state.advancedOverlay),dash:true})}
   legend(legendId,legendItems);viewStatus(key,all.length)
 }
 function renderPrices(){renderPrice("ewz");renderPrice("win")}
-function renderAll(){renderHeader();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();chartGex();chartHeatmap();renderComparison();renderPrices()}
+function renderAll(){renderHeader();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
@@ -489,8 +616,11 @@ function init(){
   if(["levels","intensity","both"].indexOf(savedMode)>=0)state.viewMode=savedMode;
   if([3,5,7,10].indexOf(savedCount)>=0)state.zoneCount=savedCount;
   if(["low","medium","high"].indexOf(savedOpacity)>=0)state.zoneOpacity=savedOpacity;
-  $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison()});
-  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderPrices()});
+  $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison();renderAdvanced();var d=$("timeMapDateSelect").value;if(d&&state.timeMapCache[d])renderTimeMap(d)});
+  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d)});
+  $("timeMapDateSelect").addEventListener("change",function(e){loadTimeMapDay(e.target.value)});
+  $("advancedMetricSelect").addEventListener("change",function(e){state.advancedMetric=e.target.value;renderAdvanced()});
+  $("advancedOverlaySelect").addEventListener("change",function(e){state.advancedOverlay=e.target.value;renderPrices()});
   $("compareBtn").addEventListener("click",loadCompare);
   $("compareSwapBtn").addEventListener("click",function(){var a=$("compareASelect").value,b=$("compareBSelect").value;$("compareASelect").value=b;$("compareBSelect").value=a;loadCompare()});
   document.querySelectorAll(".chart-tool").forEach(function(btn){btn.addEventListener("click",function(){adjustChartView(btn.getAttribute("data-chart"),btn.getAttribute("data-action"))})});
@@ -500,7 +630,7 @@ function init(){
   $("gexViewMode").addEventListener("change",function(e){state.viewMode=e.target.value;store("gex.viewMode",state.viewMode);if(state.gex){renderViewControls();renderPrices()}});
   $("zoneCountSel").addEventListener("change",function(e){state.zoneCount=parseInt(e.target.value,10);store("gex.zoneCount",String(state.zoneCount));if(state.gex){renderViewControls();renderPrices()}});
   $("zoneOpacitySel").addEventListener("change",function(e){state.zoneOpacity=e.target.value;store("gex.zoneOpacity",state.zoneOpacity);if(state.gex){renderViewControls();renderPrices()}});
-  $("resetViewBtn").addEventListener("click",function(){state.viewMode="levels";state.zoneCount=7;state.zoneOpacity="medium";store("gex.viewMode","levels");store("gex.zoneCount","7");store("gex.zoneOpacity","medium");if(state.gex){renderViewControls();renderPrices()}});
+  $("resetViewBtn").addEventListener("click",function(){state.viewMode="levels";state.zoneCount=7;state.zoneOpacity="medium";state.advancedOverlay="none";$("advancedOverlaySelect").value="none";store("gex.viewMode","levels");store("gex.zoneCount","7");store("gex.zoneOpacity","medium");if(state.gex){renderViewControls();renderPrices()}});
   $("winForm").addEventListener("submit",function(e){e.preventDefault();var raw=$("winInput").value.replace(/\./g,"").replace(",", "."),v=parseFloat(raw);state.manualWin=v>0?v:null;store("gex.manualWin",state.manualWin?String(state.manualWin):"");if(state.gex)renderAll()});
   $("autoBtn").addEventListener("click",function(){state.manualWin=null;$("winInput").value="";store("gex.manualWin","");if(state.gex)renderAll()});
   Promise.all([

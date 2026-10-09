@@ -30,6 +30,20 @@ O dashboard preserva a decomposição do GEX por vencimento nas novas coletas.
 
 O planejamento das próximas funcionalidades está em [ROADMAP.md](ROADMAP.md) quando servido no repositório GitHub, ou diretamente no arquivo `ROADMAP.md` da raiz.
 
+## Mapa temporal, Max Pain / Expected Move e Greeks avançados
+
+O dashboard também inclui:
+
+- **Mapa temporal Horário × Strike:** heatmap intradiário que mostra como o GEX líquido migra entre strikes durante a sessão, com destaque da leitura mais próxima da abertura do WIN.
+- **Max Pain por vencimento:** strike que minimiza o payout intrínseco agregado do expiry selecionado.
+- **Expected Move:** preferencialmente pelo straddle ATM (mid call + mid put), com fallback por IV ATM quando necessário; os limites são projetados também para o WIN.
+- **DEX, Vanna e Charm:** exposições por strike e vencimento, com totais agregados e gráfico selecionável.
+- **Overlay avançado opcional:** Top 3 strikes por magnitude de DEX, Vanna ou Charm podem ser projetados nos gráficos EWZ/WIN.
+
+Quando “Todos os vencimentos” está selecionado, Max Pain e Expected Move usam explicitamente o **vencimento mais próximo**. DEX/Vanna/Charm agregam a seleção inteira.
+
+As convenções completas estão em [CALCULO.md](CALCULO.md).
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:

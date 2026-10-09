@@ -51,6 +51,9 @@ jobs:
 
       - run: pip install -r collector/requirements.txt
 
+      - name: Testar núcleo analítico
+        run: python -m unittest collector.test_gex_core
+
       - name: Coletar Gamma Exposure do EWZ (CBOE)
         id: collect_gex
         continue-on-error: true

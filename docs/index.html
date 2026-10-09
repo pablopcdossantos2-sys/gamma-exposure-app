@@ -126,6 +126,61 @@
     <div class="chart compare-chart" id="compareChart"></div>
   </section>
 
+  <section class="card temporal-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Evolução intradiária</p>
+        <h2>Mapa temporal · Horário × Strike</h2>
+        <p class="note">Acompanhe como o GEX líquido migra entre strikes ao longo do dia. O filtro de vencimento acima também é aplicado quando houver dados por expiry.</p>
+      </div>
+      <label class="sel">Dia
+        <select id="timeMapDateSelect"></select>
+      </label>
+    </div>
+    <div class="heatmap-legend">
+      <span><i class="heat-neg"></i> GEX negativo</span>
+      <span><i class="heat-neutral"></i> próximo de zero</span>
+      <span><i class="heat-pos"></i> GEX positivo</span>
+      <span>★ snapshot mais próximo da abertura do WIN</span>
+    </div>
+    <div class="chart temporal-chart" id="timeStrikeHeatmap"></div>
+  </section>
+
+  <section class="card structure-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Estrutura do vencimento</p>
+        <h2>Max Pain + Expected Move</h2>
+        <p class="note">Métricas calculadas para o vencimento selecionado. Em “Todos”, usamos explicitamente o expiry mais próximo como referência.</p>
+      </div>
+      <span class="pill" id="structureExpiryBadge">—</span>
+    </div>
+    <div class="structure-kpis" id="structureKpis"></div>
+    <div class="structure-scale" id="structureScale"></div>
+    <p class="config-hint" id="structureNote"></p>
+  </section>
+
+  <section class="card advanced-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Greeks de segunda ordem</p>
+        <h2>DEX · Vanna · Charm</h2>
+        <p class="note">Proxies de exposição de dealer sob hipótese explícita de dealers short das opções. Mantidos separados da convenção de sinal do GEX.</p>
+      </div>
+      <label class="sel">Métrica
+        <select id="advancedMetricSelect">
+          <option value="dex">DEX</option>
+          <option value="vanna">Vanna Exposure</option>
+          <option value="charm">Charm Exposure</option>
+        </select>
+      </label>
+    </div>
+    <div class="advanced-kpis" id="advancedKpis"></div>
+    <div class="legend" id="advancedLegend"></div>
+    <div class="chart advanced-chart" id="advancedExposureChart"></div>
+    <p class="config-hint">DEX = notional delta; Vanna = variação estimada do notional delta para +1 ponto de volatilidade; Charm = variação estimada do notional delta por um dia decorrido.</p>
+  </section>
+
   <section class="card display-config">
     <div class="card-head">
       <div>
@@ -159,6 +214,15 @@
           <option value="low">Suave</option>
           <option value="medium" selected>Média</option>
           <option value="high">Forte</option>
+        </select>
+      </label>
+      <label>
+        Overlay avançado
+        <select id="advancedOverlaySelect">
+          <option value="none" selected>Nenhum</option>
+          <option value="dex">Top DEX</option>
+          <option value="vanna">Top Vanna</option>
+          <option value="charm">Top Charm</option>
         </select>
       </label>
     </div>
