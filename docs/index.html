@@ -59,6 +59,19 @@
     </div>
   </section>
 
+  <section class="card quality-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Qualidade e freshness</p>
+        <h2>Estado dos dados</h2>
+        <p class="note">Separa idade técnica do snapshot, cobertura da cadeia e estado dos feeds. Fonte pública delayed não é tratada como real-time.</p>
+      </div>
+      <span class="quality-status" id="qualityStatus">Verificando…</span>
+    </div>
+    <div class="quality-grid" id="qualityGrid"></div>
+    <div class="quality-flags" id="qualityFlags"></div>
+  </section>
+
   <section class="card focal">
     <div class="card-head">
       <div>
@@ -179,6 +192,48 @@
     <div class="legend" id="advancedLegend"></div>
     <div class="chart advanced-chart" id="advancedExposureChart"></div>
     <p class="config-hint">DEX = notional delta; Vanna = variação estimada do notional delta para +1 ponto de volatilidade; Charm = variação estimada do notional delta por um dia decorrido.</p>
+  </section>
+
+  <section class="card iv-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Volatilidade implícita</p>
+        <h2>IV Skew + Term Structure</h2>
+        <p class="note">Skew do vencimento selecionado e estrutura a termo da IV ATM entre expiries.</p>
+      </div>
+      <span class="pill" id="ivExpiryBadge">—</span>
+    </div>
+    <div class="iv-kpis" id="ivKpis"></div>
+    <div class="dual-chart-grid">
+      <div>
+        <h3>IV por strike</h3>
+        <div class="legend" id="ivSkewLegend"></div>
+        <div class="chart iv-chart" id="ivSkewChart"></div>
+      </div>
+      <div>
+        <h3>Term Structure · IV ATM</h3>
+        <div class="legend" id="termLegend"></div>
+        <div class="chart iv-chart" id="termStructureChart"></div>
+      </div>
+    </div>
+    <p class="config-hint" id="ivStructureNote"></p>
+  </section>
+
+  <section class="card oi-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Mudança entre sessões</p>
+        <h2>ΔOI por Strike</h2>
+        <p class="note">Compara open interest entre o dia escolhido e a sessão anterior. Não usa diferenças intradiárias como se fossem mudança de OI.</p>
+      </div>
+      <label class="sel">Sessão
+        <select id="oiDateSelect"></select>
+      </label>
+    </div>
+    <div class="oi-summary" id="oiSummary"></div>
+    <div class="legend" id="oiLegend"></div>
+    <div class="chart oi-chart" id="oiDeltaChart"></div>
+    <p class="config-hint" id="oiNote"></p>
   </section>
 
   <section class="card display-config">
