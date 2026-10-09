@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",chartViews:{ewz:null,win:null},compareA:null,compareB:null};
+var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null};
 var dragState=null,dragRAF=null;
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -48,6 +48,15 @@ function activeGex(){
   if(!p)return state.gex;
   return Object.assign({},state.gex,p,{expiry_profiles:state.gex.expiry_profiles,generated_at:state.gex.generated_at,symbol:state.gex.symbol,demo:state.gex.demo})
 }
+function structureProfile(){
+  if(!state.gex||!Array.isArray(state.gex.expiry_profiles)||!state.gex.expiry_profiles.length)return null;
+  if(state.expiryFilter!=="all"){
+    return state.gex.expiry_profiles.find(function(p){return p.expiration===state.expiryFilter})||null
+  }
+  return state.gex.expiry_profiles.slice().sort(function(a,b){return (a.dte||0)-(b.dte||0)})[0]
+}
+function metricLabel(metric){return metric==="dex"?"DEX":metric==="vanna"?"Vanna":"Charm"}
+function metricColor(metric){return metric==="dex"?cssVar("--cyan"):metric==="vanna"?cssVar("--purple"):cssVar("--green")}
 function niceTicks(min,max,n){var span=max-min||1,step=Math.pow(10,Math.floor(Math.log10(span/n))),err=span/n/step;step*=err>=7.5?10:err>=3.5?5:err>=1.5?2:1;var out=[],v=Math.ceil(min/step)*step;for(;v<=max+step*1e-6;v+=step)out.push(Math.abs(v)<step*1e-9?0:v);return out}
 function compact(v){var a=Math.abs(v),s=v<0?"−":"";if(a>=1e9)return s+fmt2.format(a/1e9)+" bi";if(a>=1e6)return s+fmt2.format(a/1e6)+" mi";if(a>=1e3)return s+fmt0.format(a/1e3)+" mil";return s+fmt0.format(a)}
 var tip=$("tip");
@@ -56,14 +65,18 @@ function hideTip(){tip.hidden=true}
 function legend(id,items){var box=$(id);box.innerHTML="";items.forEach(function(it){var s=document.createElement("span"),i=document.createElement("i");i.style.background=it.color;if(it.cls)i.className=it.cls;if(it.dash){i.className="dash";i.style.color=it.color} s.appendChild(i);s.appendChild(document.createTextNode(it.name));box.appendChild(s)})}
 
 function levelRows(){
-  var d=activeGex();
-  return[
+  var d=activeGex(),s=structureProfile();
+  var rows=[
     {name:"Call Wall",v:d.call_wall,color:cssVar("--blue"),note:"Maior GEX de calls; resistência/oferta potencial."},
     {name:"Gamma Flip",v:d.flip,color:cssVar("--purple"),note:"Divisor entre regime de gamma positivo e negativo."},
     {name:"Preço EWZ do GEX",v:d.spot,color:cssVar("--text"),note:"Preço de referência usado no cálculo do GEX."},
     {name:"Put Wall",v:d.put_wall,color:cssVar("--orange"),note:"Maior magnitude de GEX de puts; suporte/demanda potencial."},
     {name:"Maior |GEX|",v:d.max_abs_strike,color:cssVar("--cyan"),note:"Strike com maior GEX líquido absoluto."}
-  ]
+  ];
+  if(s&&s.max_pain!=null)rows.push({name:"Max Pain",v:s.max_pain,color:cssVar("--axis"),note:"Strike que minimiza o payout intrínseco agregado no vencimento de referência."});
+  if(s&&s.expected_low!=null)rows.push({name:"Expected Move −",v:s.expected_low,color:cssVar("--cyan"),note:"Limite inferior do expected move do vencimento de referência."});
+  if(s&&s.expected_high!=null)rows.push({name:"Expected Move +",v:s.expected_high,color:cssVar("--cyan"),note:"Limite superior do expected move do vencimento de referência."});
+  return rows
 }
 function regime(d){if(d.flip==null)return d.net_gex>=0?"Gamma líquido positivo":"Gamma líquido negativo";return d.spot>=d.flip?"EWZ acima do Flip · gamma positivo":"EWZ abaixo do Flip · gamma negativo"}
 function renderHeader(){
