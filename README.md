@@ -95,6 +95,23 @@ O dashboard inclui também:
 
 O proxy por volume não identifica agressor nem posição dealer e nunca é somado ao GEX por OI.
 
+## Laboratório isolado para dados pagos/licenciados
+
+O repositório contém também `experimental/paid-data-architecture/`, que **não é carregado pelo dashboard nem pelos coletores gratuitos**.
+
+Esse laboratório já possui:
+- modelos normalizados de eventos de opções EWZ e microestrutura WINFUT;
+- contrato provider-neutral e declaração de capabilities;
+- provider mock;
+- signed delta/gamma flow com provenance da classificação;
+- event store JSONL e replay determinístico;
+- cost guard para backfill histórico;
+- primitivas de trade pressure e book imbalance;
+- schemas JSON;
+- testes e workflow de CI próprios.
+
+Ele existe para desenvolver antecipadamente ideias que exigem feed real-time, signed flow, backfill licenciado ou book/trades oficiais, sem incorporá-las ao sistema ativo antes de haver licença, entitlement e orçamento.
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:
