@@ -84,6 +84,17 @@ Para métricas de volume, o coletor agora usa a chain válida completa, incluind
 
 Enquanto ainda não houver três sessões históricas anteriores compatíveis, o painel de volume anômalo informa **baseline insuficiente** em vez de gerar um sinal artificial.
 
+## Confluências de preço e OI-weighted × Volume-weighted
+
+O dashboard inclui também:
+
+- **ATR(14), RSI(14) e Bandas de Bollinger(20, 2σ)** sobre os candles de EWZ ou WIN1!, como camada opcional e totalmente separada do cálculo de GEX.
+- **Comparação OI-weighted × Volume-weighted Gamma:** o GEX por OI representa inventário aberto; o segundo modelo é um proxy de atividade que pondera gamma pelo volume acumulado da sessão.
+- A comparação dos dois modelos usa perfis normalizados para estudar forma/concentração sem fingir equivalência de escala.
+- Totais brutos, maior |GEX|/|proxy| e correlação por strike permanecem visíveis.
+
+O proxy por volume não identifica agressor nem posição dealer e nunca é somado ao GEX por OI.
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:
