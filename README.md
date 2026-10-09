@@ -54,6 +54,30 @@ Também há interação direta com o gráfico:
 
 Em telas touch, os botões permanecem como forma principal de navegação para não bloquear a rolagem normal da página. EWZ e WIN mantêm estados de zoom separados durante a sessão.
 
+Os controles compactos ficam **sobre o próprio gráfico**, no canto superior direito, para aproximar a experiência de plataformas de mercado. O projeto continua usando o renderizador SVG próprio porque as bandas de intensidade de GEX são personalizadas; uma futura migração para TradingView Lightweight Charts pode ser avaliada sem alterar a camada de dados.
+
+## Histórico intradiário de Gamma Exposure
+
+Cada coleta real do CBOE gera agora um snapshot navegável em:
+
+```
+docs/data/gex-snapshots/AAAA-MM-DD/HHMMSS.json
+```
+
+O arquivo `docs/data/gex-snapshots/index.json` mantém o catálogo das coletas. A página oferece menus de **dia** e **horário da coleta** e, ao selecionar um snapshot:
+
+- o gráfico de GEX usa o GEX por strike daquele momento;
+- Call Wall, Put Wall, Gamma Flip e demais níveis passam a refletir aquela coleta;
+- a conversão EWZ → WIN usa candles coincidentes mais próximos do horário do snapshot, e não os preços atuais;
+- os gráficos de preço são deslocados para a região temporal correspondente;
+- uma linha vertical identifica o momento do GEX no gráfico de preço.
+
+A B3 informa abertura normal do WIN às **09:00 (horário de Brasília)**. Em cada dia, o índice histórico identifica automaticamente o snapshot cuja coleta ocorreu mais perto de 09:00 e o menu o destaca como **“★ abertura WIN”**.
+
+Além da grade regular de aproximadamente 15 minutos, o GitHub Actions faz tentativas extras às **08:57** e **09:02 BRT** em dias úteis para aumentar a chance de termos uma fotografia muito próxima da abertura.
+
+Importante: o menu diferencia o **horário em que nossa coleta ocorreu** do timestamp informado pelo CBOE. A fonte é atrasada; portanto, “coleta às 09:02” não significa que todos os dados da cadeia sejam exatamente das 09:02.
+
 ## Fontes
 
 - **Gamma Exposure:** chain de opções do CBOE, com cálculo próprio em `collector/gex_core.py`.
