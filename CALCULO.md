@@ -406,3 +406,146 @@ Esse mecanismo é independente dos cálculos e pode ser ampliado para novas seç
 A partir do snapshot v5, os perfis por vencimento também podem preservar o ranking `pinning` calculado no coletor.
 
 Snapshots anteriores continuam compatíveis: o front-end consegue derivar o ranking a partir de GEX/OI armazenados quando necessário.
+
+
+## 20. Volume anômalo por contrato lógico
+
+A unidade analisada é:
+
+    expiry + strike + lado (call ou put)
+
+O volume é **cumulativo intradiário**, portanto comparar o valor das 10:00 de hoje com o fechamento de ontem seria metodologicamente incorreto.
+
+Para cada snapshot atual:
+
+1. identificamos o horário local da coleta;
+2. buscamos, em cada sessão anterior, o snapshot mais próximo daquele horário;
+3. aceitamos somente comparações até ±60 minutos;
+4. coletamos o volume do mesmo expiry, strike e lado;
+5. exigimos no mínimo 3 sessões anteriores compatíveis.
+
+### Baseline robusto
+
+Usamos a mediana:
+
+    baseline = mediana(volumes históricos)
+
+e o MAD:
+
+    MAD = mediana(|volume_i - baseline|)
+
+Escala robusta:
+
+    escala = 1,4826 × MAD
+
+Quando MAD = 0, usamos um fallback proporcional à raiz do baseline para evitar divisão por zero.
+
+O robust z é:
+
+    robust_z = (volume_atual - baseline) / escala
+
+Para sinalizar uma anomalia, exigimos:
+
+    robust_z >= 3
+
+e também magnitude material:
+
+- baseline > 0: volume atual >= 1,5 × baseline;
+- baseline = 0: volume atual >= 20.
+
+### OI zero não elimina volume
+
+A cadeia usada no GEX continua filtrando contratos com OI > 0, porque OI zero implica contribuição GEX zero.
+
+A análise de volume, porém, usa uma segunda visão da chain que preserva contratos válidos mesmo com OI = 0. Assim, negociação atual não é descartada apenas porque o contrato não tinha open interest positivo na base anterior.
+
+## 21. Put / Call Ratios
+
+Calculamos duas razões separadas:
+
+    P/C OI = OI_puts / OI_calls
+
+    P/C Volume = Volume_puts / Volume_calls
+
+As razões são calculadas:
+
+- no agregado da chain;
+- por expiry;
+- ao longo dos snapshots intradiários.
+
+Interpretação puramente descritiva:
+
+- razão > 1: mais puts que calls naquela métrica;
+- razão < 1: mais calls que puts;
+- razão próxima de 1: composição relativamente equilibrada.
+
+### Importante
+
+OI e volume medem coisas diferentes:
+
+- **OI** = estoque de contratos abertos;
+- **volume** = atividade acumulada da sessão.
+
+Por isso o sistema não combina os dois em um único “sentimento”.
+
+O volume usa toda a chain válida, inclusive opções com OI = 0.
+
+## 22. Net GEX suavizado — filtro de Kalman
+
+A série bruta de Net GEX é sempre preservada e exibida.
+
+A suavização é opcional e utiliza um filtro de Kalman escalar:
+
+    P = P + Q
+    K = P / (P + R)
+    estimativa = estimativa + K × (medida - estimativa)
+    P = (1 - K) × P
+
+onde:
+
+- `R` é derivado da variância observada da série;
+- `Q` controla a responsividade.
+
+Perfis disponíveis:
+
+- lenta: `Q = 0,002 × R`;
+- média: `Q = 0,025 × R`;
+- rápida: `Q = 0,15 × R`.
+
+A linha filtrada:
+
+- não substitui `net_gex`;
+- não altera Walls;
+- não altera Gamma Flip;
+- não altera overlays ou scorecards;
+- é somente uma ajuda visual para observar tendência temporal.
+
+## 23. Contexto automático determinístico
+
+O sistema gera texto em linguagem simples usando apenas regras explícitas.
+
+As fontes atuais do resumo incluem:
+
+- posição do spot em relação ao Gamma Flip;
+- distância percentual para Call Wall e Put Wall;
+- P/C por OI e volume;
+- IV ATM, RR25 e regime da term structure;
+- maior score de Gamma Gravity;
+- mudança do Net GEX e Walls desde o snapshot ★ da abertura;
+- status de qualidade/freshness.
+
+O texto não usa um modelo generativo, não tenta prever a direção do mercado e não emite recomendação.
+
+Seu objetivo é educativo: transformar números já exibidos em uma sequência legível de perguntas e observações.
+
+## 24. Snapshot v6
+
+Snapshots v6 passam a preservar:
+
+- totais de OI de calls e puts;
+- totais de volume de calls e puts;
+- Put/Call Ratio por OI;
+- Put/Call Ratio por volume;
+- volume por strike/lado considerando a chain válida completa.
+
+A separação entre contratos usados em GEX e contratos usados em atividade/volume evita que opções com OI zero distorçam o GEX ao mesmo tempo em que preserva sua negociação atual.
