@@ -78,6 +78,32 @@ Além da grade regular de aproximadamente 15 minutos, o GitHub Actions faz tenta
 
 Importante: o menu diferencia o **horário em que nossa coleta ocorreu** do timestamp informado pelo CBOE. A fonte é atrasada; portanto, “coleta às 09:02” não significa que todos os dados da cadeia sejam exatamente das 09:02.
 
+## Página didática — Entenda o GEX
+
+A GitHub Page possui uma segunda página, `docs/entenda-gex.html`, acessível pela navegação superior em **Entenda o GEX**. Ela explica de forma progressiva:
+
+- Delta, Gamma e Gamma Exposure;
+- diferença entre regimes de gamma positivo e negativo;
+- Call Wall, Put Wall, Gamma Flip e maior `|GEX|`;
+- como ler o gráfico de GEX por strike;
+- como funciona a projeção EWZ → WIN;
+- uma rotina prática para usar GEX como contexto;
+- erros comuns de interpretação, limitações e glossário.
+
+O guia reforça que GEX é um modelo de estrutura/hedge e regime de volatilidade, não um indicador direcional isolado.
+
+## Autoescala vertical dos gráficos de preço
+
+Por padrão, os gráficos de EWZ e WIN usam apenas a **máxima e a mínima dos candles visíveis** para definir a escala Y. Níveis de GEX são overlays e não ampliam artificialmente a escala.
+
+A visualização inicial:
+
+- mantém a faixa de preço centralizada verticalmente;
+- usa uma margem pequena, de aproximadamente 2,5% da amplitude dos candles em cada extremidade;
+- deixa máximas e mínimas próximas das bordas superior e inferior para aproveitar melhor a altura do gráfico.
+
+O botão **C·Y** centraliza novamente o preço no eixo vertical sem alterar o zoom horizontal ou o nível de zoom Y selecionado. O botão **Resetar** continua restaurando todos os controles do gráfico.
+
 ## Fontes
 
 - **Gamma Exposure:** chain de opções do CBOE, com cálculo próprio em `collector/gex_core.py`.
