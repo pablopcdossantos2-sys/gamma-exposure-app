@@ -121,20 +121,6 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 
 ---
 
-# Próximos blocos — dados gratuitos
-
-## C5 — Indicadores de preço como confluência opcional
-**Prioridade:** média/baixa.
-
-Adicionar ATR, RSI e Bollinger como camadas opcionais, sem incorporá-los ao cálculo de GEX.
-
-## D1 — Comparação OI-weighted × Volume-weighted
-**Prioridade:** média.
-
-Manter modelos explicitamente separados:
-- OI = inventário/posições abertas;
-- volume = atividade intradiária.
-
 ---
 
 # Arquitetura futura — dados pagos/entitled
@@ -149,11 +135,15 @@ Mantém separados:
 
 ---
 
-# Sequência sugerida
+# Próxima fase
 
-### Próximo bloco recomendado
-**C5 + D1**
-- indicadores de preço opcionais;
-- comparação OI-weighted × Volume-weighted.
+O conjunto gratuito planejado até D1 está implementado. A próxima fase é **acumular histórico e validar** os módulos já existentes, enquanto a arquitetura de funcionalidades que exigem dados pagos/licenciados evolui isoladamente em `experimental/paid-data-architecture/`.
 
-O roadmap deve ser revisado sempre que uma funcionalidade for integrada, movendo-a para “Concluído”.
+O laboratório pago deve permanecer fora do runtime ativo até que exista:
+- provider escolhido;
+- entitlement/licença adequados;
+- política de armazenamento/redistribuição confirmada;
+- orçamento;
+- testes com dados mock/replay aprovados.
+
+O roadmap deve ser revisado sempre que uma funcionalidade for integrada.
