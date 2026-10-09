@@ -66,17 +66,64 @@
         <h2>Gamma Exposure (GEX) por strike</h2>
         <p class="note">Calls positivas, puts negativas e GEX líquido. As linhas verticais mostram preço, Gamma Flip e paredes principais.</p>
       </div>
-      <label class="sel">Faixa
-        <select id="rangeSel">
-          <option value="0.10">±10%</option>
-          <option value="0.15" selected>±15%</option>
-          <option value="0.25">±25%</option>
-          <option value="1">Tudo</option>
-        </select>
-      </label>
+      <div class="gex-card-controls">
+        <label class="sel">Vencimento
+          <select id="expirySelect">
+            <option value="all">Todos os vencimentos</option>
+          </select>
+        </label>
+        <label class="sel">Faixa
+          <select id="rangeSel">
+            <option value="0.10">±10%</option>
+            <option value="0.15" selected>±15%</option>
+            <option value="0.25">±25%</option>
+            <option value="1">Tudo</option>
+          </select>
+        </label>
+      </div>
     </div>
     <div class="legend" id="legendGex"></div>
     <div class="chart chart-gex" id="chartGex"></div>
+  </section>
+
+  <section class="card heatmap-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Estrutura por vencimento</p>
+        <h2>Heatmap GEX · Strike × Vencimento</h2>
+        <p class="note">Cada célula mostra o GEX líquido daquele strike em um vencimento. Azul = positivo; laranja = negativo; maior intensidade = maior |GEX|.</p>
+      </div>
+      <span class="pill" id="heatmapStatus">Aguardando perfil por expiry</span>
+    </div>
+    <div class="heatmap-legend">
+      <span><i class="heat-neg"></i> GEX negativo</span>
+      <span><i class="heat-neutral"></i> próximo de zero</span>
+      <span><i class="heat-pos"></i> GEX positivo</span>
+    </div>
+    <div class="chart heatmap-chart" id="gexHeatmap"></div>
+  </section>
+
+  <section class="card compare-card">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Comparação histórica</p>
+        <h2>Comparar dois snapshots de GEX</h2>
+        <p class="note">Compare duas leituras agregadas para ver deslocamentos de GEX líquido, Walls, Flip e perfil por strike.</p>
+      </div>
+      <button type="button" class="ghost" id="compareSwapBtn">Trocar A ↔ B</button>
+    </div>
+    <div class="compare-controls">
+      <label>Snapshot A
+        <select id="compareASelect"></select>
+      </label>
+      <label>Snapshot B
+        <select id="compareBSelect"></select>
+      </label>
+      <button type="button" id="compareBtn">Comparar</button>
+    </div>
+    <div class="compare-summary" id="compareSummary"></div>
+    <div class="legend" id="compareLegend"></div>
+    <div class="chart compare-chart" id="compareChart"></div>
   </section>
 
   <section class="card display-config">

@@ -66,7 +66,7 @@ def archive_snapshot(latest, outdir, now):
 
     snap = dict(latest)
     snap.pop("curve", None)
-    snap["snapshot_version"] = 1
+    snap["snapshot_version"] = 2
     snap["snapshot_timezone"] = "America/Sao_Paulo"
 
     rel_file = f"data/gex-snapshots/{day}/{hhmmss}.json"
@@ -140,6 +140,7 @@ def main():
     if not contracts:
         raise RuntimeError("Chain vazia apos filtros.")
     res = gex_core.compute(spot, contracts)
+    expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts)
 
     latest = {
         "symbol": symbol,
@@ -148,6 +149,7 @@ def main():
         "cboe_timestamp": raw["data"].get("timestamp") or raw.get("timestamp"),
         "max_dte": a.max_dte,
         "raw_file": raw_file,
+        "expiry_profiles": expiry_profiles,
         **res,
     }
     write_json(os.path.join(a.outdir, "latest.json"), latest)
