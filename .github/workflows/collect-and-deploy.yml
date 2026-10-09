@@ -2,8 +2,11 @@ name: Coletar mercado e publicar no Pages
 
 on:
   schedule:
-    # A cada 15 min em dias úteis durante a janela que cobre B3 + mercado dos EUA.
-    # Minutos deslocados do quarto de hora reduzem a chance de fila do GitHub Actions.
+    # Capturas especiais ao redor da abertura normal do WIN (09:00 BRT = 12:00 UTC).
+    # Ter duas tentativas próximas ajuda a compensar atrasos ocasionais do GitHub Actions.
+    - cron: "57 11 * * 1-5"
+    - cron: "2 12 * * 1-5"
+    # Depois da abertura, coleta aproximadamente a cada 15 minutos.
     - cron: "7,22,37,52 12-22 * * 1-5"
   workflow_dispatch:
     inputs:
