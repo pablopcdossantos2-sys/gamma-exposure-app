@@ -28,7 +28,7 @@ O dashboard preserva a decomposição do GEX por vencimento nas novas coletas.
 - **Comparador de snapshots:** escolha duas leituras históricas para comparar Spot, Net GEX, Call Wall, Put Wall, Gamma Flip e o perfil de GEX por strike.
 - Snapshots antigos, coletados antes dessa estrutura, continuam disponíveis em modo agregado.
 
-O planejamento das próximas funcionalidades está em [ROADMAP.md](../ROADMAP.md) quando servido no repositório GitHub, ou diretamente no arquivo `ROADMAP.md` da raiz.
+O planejamento das próximas funcionalidades está em [ROADMAP.md](ROADMAP.md) quando servido no repositório GitHub, ou diretamente no arquivo `ROADMAP.md` da raiz.
 
 ## Visualização configurável das regiões de GEX
 
