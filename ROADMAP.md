@@ -7,8 +7,7 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 ### A1 — Heatmap Strike × Vencimento
 - matriz de GEX líquido por strike e vencimento;
 - intensidade visual proporcional a `|GEX|`;
-- tooltip com GEX líquido, calls, puts e DTE;
-- novos snapshots preservam decomposição por expiry.
+- tooltip com GEX líquido, calls, puts e DTE.
 
 ### A2 — Comparação de snapshots
 - escolha de dois snapshots históricos;
@@ -18,86 +17,94 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 ### A3 — Mapa temporal Time × Strike
 - heatmap intradiário horário × strike;
 - destaque da abertura do WIN;
-- Walls marcadas dentro da matriz;
-- compatível com filtro por expiry.
+- Walls marcadas dentro da matriz.
 
 ### A4 — Max Pain + Expected Move
 - Max Pain por vencimento;
 - Expected Move pelo straddle ATM, com fallback por IV;
-- faixa EWZ e projeção para WIN;
-- níveis integrados aos gráficos de preço.
+- faixa EWZ e projeção para WIN.
 
 ### A5 — Filtros por vencimento
 - visão agregada ou expiry individual;
 - KPIs, Walls, Flip, gráficos e overlays seguem o filtro.
 
 ### B1 — DEX + Vanna + Charm
-- exposições por strike e expiry;
+- exposições por strike/expiry;
 - totais agregados;
-- gráfico selecionável;
-- overlays opcionais no EWZ/WIN;
-- metodologia separada do GEX.
+- overlays opcionais.
 
 ### B2 — IV Skew + Term Structure
+- IV calls/puts por strike;
+- IV ATM por expiry;
+- RR25, BF25 e term structure;
+- slope em vol points/30 dias.
+
+### B3 — Stress Lab / Market Wind Tunnel
 **Status:** implementado.
 
-- IV de calls e puts por strike;
-- IV ATM por expiry;
-- Put 25Δ e Call 25Δ;
-- 25Δ Risk Reversal e Butterfly;
-- term structure de IV ATM;
-- slope normalizado em vol points/30 dias;
-- classificação descritiva em contango, backwardation ou flat;
-- filtro de vencimento aplicado à curva de skew.
+- choques configuráveis de spot, IV e passagem do tempo;
+- recálculo aproximado de GEX, Walls, Flip, DEX, Vanna e Charm;
+- comparação base × cenário;
+- gráfico dos perfis de GEX;
+- usa o snapshot/expiry ativos;
+- deixa explícito que OI permanece fixo e que o modelo usa agregados por strike.
+
+### B4 — Pinning / Gamma Gravity
+**Status:** implementado.
+
+- ranking Top 10 por expiry;
+- score combina concentração absoluta de gamma, OI, proximidade do spot e tempo até vencimento;
+- score normalizado 0–100;
+- projeção dos strikes para WIN;
+- tratado explicitamente como heurística estrutural, não probabilidade de fechamento.
 
 ### B5 — ΔOI entre sessões
+- OI call/put por strike e expiry;
+- comparação apenas entre sessões/dias;
+- ΔOI calls, puts e líquido.
+
+### C1 — Scorecard de validação histórica
 **Status:** implementado.
 
-- OI call/put preservado por strike e expiry nos snapshots v4+;
-- comparação sempre entre dias/sessões, nunca entre horários intradiários;
-- ΔOI calls, puts e líquido por strike;
-- visão agregada ou por vencimento;
-- painel informa quando ainda não existem duas sessões compatíveis.
+- avalia Call Wall e Put Wall em snapshots históricos;
+- mede toque, rejeição, rompimento e tempo até interação;
+- calcula métricas separadas para EWZ e níveis projetados no WIN;
+- horizontes configuráveis de 60, 120 e 240 minutos;
+- exclui snapshots sem toda a janela futura disponível;
+- rejeição/rompimento usam regra explícita de 0,15% após o toque;
+- amostra cresce automaticamente com o histórico.
 
 ### C2 — Painel de qualidade / freshness
+- idade técnica, cobertura da chain e flags;
+- estado de candles EWZ/WIN;
+- distinção entre freshness técnico e feed delayed.
+
+### D2 — Replay reproduzível / recibo de análise
 **Status:** implementado.
 
-- idade técnica entre timestamp da fonte e coleta;
-- sessão de mercado em Nova York;
-- contratos/calls/puts/expiries/strikes utilizáveis;
-- cobertura de IV, bid/ask e OI;
-- flags de chain incompleta, baixa cobertura e timestamp antigo;
-- status OK / Atenção / Crítico;
-- estado dos candles EWZ/WIN incorporado ao painel;
-- indicação explícita de que a fonte pública CBOE é delayed e não real-time.
+- recibo do Stress Lab com snapshot, versão, expiry, parâmetros, base e resultado;
+- persistência local no navegador;
+- replay de um cenário salvo;
+- exportação individual ou consolidada em JSON;
+- limite local de 50 recibos.
+
+### Educação contextual — ícones de informação
+**Status:** implementado.
+
+- cada seção do dashboard possui ícone `i`;
+- pop-up padronizada com “o que mostra”, “como interpretar” e “cuidados/limitações”;
+- suporte a teclado/Esc e clique fora;
+- link para o guia didático completo;
+- arquitetura reutilizável em `docs/help.js` para futuras seções.
 
 ---
 
 # Próximos blocos — dados gratuitos
 
-## B3 — Stress Lab / Market Wind Tunnel
-**Prioridade:** alta.
-
-Página própria para alterar spot, IV, passagem do tempo e expiry e recalcular:
-- GEX;
-- Flip e Walls;
-- DEX;
-- Vanna;
-- Charm.
-
-Deve salvar um recibo reproduzível do cenário.
-
-## B4 — Pinning / Gamma Gravity
-**Prioridade:** média.
-
-Ranking de strikes com maior atração teórica usando OI, gamma, distância do spot, IV e tempo.
-
-**Aviso obrigatório:** heurística/modelo, não previsão garantida.
-
 ## B6 — Volume anômalo por contrato
 **Prioridade:** média.
 
-Baseline histórico por contrato/strike/expiry e destaque de atividade muito acima da própria linha de base.
+Baseline histórico por contrato/strike/expiry e destaque de atividade acima da própria linha de base.
 
 ## B7 — Put/Call Ratios
 **Prioridade:** média.
@@ -107,27 +114,10 @@ Baseline histórico por contrato/strike/expiry e destaque de atividade muito aci
 - por expiry e agregado;
 - histórico.
 
----
-
-# Validação e qualidade
-
-## C1 — Scorecard de validação histórica
-**Prioridade:** alta.
-
-Medir:
-- toques, rejeições e rompimentos de Walls;
-- tempo até toque;
-- comportamento do WIN;
-- desempenho por regime de GEX;
-- distância inicial até níveis;
-- comportamento do snapshot de abertura.
-
-Sempre evitar look-ahead.
-
 ## C3 — GEX suavizado opcional
 **Prioridade:** média.
 
-Filtro de Kalman ou equivalente para a série histórica, sempre mantendo o valor raw disponível.
+Filtro de Kalman ou equivalente para a série histórica, sempre mantendo o valor bruto visível.
 
 ## C4 — Contexto automático em linguagem simples
 **Prioridade:** média.
@@ -139,15 +129,12 @@ Resumo determinístico de distância a Walls, posição relativa ao Flip e mudan
 
 ATR, RSI e Bollinger opcionais, sem misturá-los ao cálculo de GEX.
 
----
-
-# Ideias adicionais
-
 ## D1 — Comparação OI-weighted × Volume-weighted
-Modelos separados: OI descreve inventário; volume descreve atividade intradiária.
+**Prioridade:** média.
 
-## D2 — Replay reproduzível / recibo de análise
-Registrar snapshot, modelo, expiry, parâmetros, timestamp e saída de cada análise/cenário.
+Manter dois modelos separados:
+- OI = inventário/posições abertas;
+- volume = atividade intradiária.
 
 ---
 
@@ -166,20 +153,15 @@ Mantém separados:
 # Sequência sugerida
 
 ### Próximo bloco recomendado
-**B3 + B4 + C1 + D2**
-- Stress Lab / Wind Tunnel;
-- pinning;
-- validação histórica;
-- replay reproduzível.
-
-### Depois
 **B6 + B7 + C3 + C4**
 - volume anômalo;
 - Put/Call ratios;
-- suavização;
+- GEX suavizado;
 - contexto automático.
 
-### Camadas opcionais
+### Depois
 **C5 + D1**
+- indicadores de preço opcionais;
+- OI-weighted × Volume-weighted.
 
 O roadmap deve ser revisado sempre que uma funcionalidade for integrada, movendo-a para “Concluído”.
