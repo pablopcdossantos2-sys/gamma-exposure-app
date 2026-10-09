@@ -236,3 +236,173 @@ Podem incluir:
 - `source_timestamp_very_old`.
 
 O front-end também incorpora avisos do coletor de preços quando EWZ/WIN estão stale ou apresentam erro.
+
+
+## 14. Stress Lab / Market Wind Tunnel
+
+O Stress Lab usa o **snapshot e o vencimento ativos** como base e aplica três choques configuráveis:
+
+- deslocamento percentual do spot do EWZ;
+- deslocamento uniforme da IV em pontos de volatilidade;
+- passagem de dias.
+
+Como os snapshots guardam dados agregados por strike/lado, o cenário cria dois pseudo-contratos agregados por strike: call e put, usando:
+
+- OI call/put;
+- IV call/put ponderada;
+- strike;
+- tempo restante.
+
+O OI permanece fixo durante o cenário.
+
+Para o novo spot/IV/tempo, recalculamos por Black-Scholes:
+
+- gamma e GEX por strike;
+- delta e DEX;
+- vanna;
+- charm;
+- Call Wall;
+- Put Wall;
+- maior |GEX|;
+- Gamma Flip por varredura de preços hipotéticos entre 80% e 120% do spot do cenário.
+
+### Limitação
+
+Esse laboratório é um **teste de sensibilidade**. Ele não tenta prever nova demanda por opções, mudança futura de OI, smile dinâmico completo, juros/carry, fluxo assinado ou microestrutura.
+
+A versão do modelo é registrada como:
+
+    stress-v1-aggregate
+
+## 15. Pinning / Gamma Gravity
+
+O ranking é calculado por vencimento e combina quatro componentes:
+
+1. magnitude absoluta do gamma/GEX no strike;
+2. OI total;
+3. proximidade entre strike e spot;
+4. tempo até o vencimento.
+
+A forma atual é:
+
+    gamma_component = |GEX_call| + |GEX_put|
+    proximity = exp( - |strike/spot - 1| / 0,03 )
+    time_weight = 1 / sqrt(max(DTE, 0,5))
+
+    raw_score =
+        gamma_component^0,60
+        × sqrt(OI_total + 1)
+        × proximity
+        × time_weight
+
+Os scores são normalizados dentro do expiry:
+
+    score = raw_score / maior_raw_score × 100
+
+O maior strike recebe 100 e os demais valores relativos.
+
+### Interpretação correta
+
+O score identifica strikes que merecem atenção estrutural. Ele **não** representa:
+
+- probabilidade de fechamento;
+- chance de toque;
+- suporte/resistência garantidos;
+- previsão direcional.
+
+## 16. Scorecard histórico de Walls
+
+O scorecard avalia Call Wall e Put Wall usando apenas dados que já existiam no timestamp do snapshot.
+
+### Elegibilidade
+
+Um snapshot entra na análise somente se:
+
+- possui Wall e spot;
+- existem candles posteriores;
+- toda a janela futura selecionada está disponível.
+
+Horizontes atuais:
+
+- 60 minutos;
+- 120 minutos;
+- 240 minutos.
+
+### Toque
+
+Uma Wall é considerada tocada quando um candle posterior satisfaz:
+
+    mínima <= nível <= máxima
+
+### Rejeição e rompimento
+
+Após o primeiro toque, observamos até três candles adicionais.
+
+Para Call Wall:
+
+    rompimento: fechamento >= Wall × 1,0015
+    rejeição:   fechamento <= Wall × 0,9985
+
+Para Put Wall:
+
+    rompimento: fechamento <= Wall × 0,9985
+    rejeição:   fechamento >= Wall × 1,0015
+
+Se houver rompimento, ele prevalece sobre rejeição na janela avaliada.
+
+### WIN
+
+Para o WIN, o nível histórico é projetado usando a razão EWZ/WIN de candles coincidentes próximos ao timestamp do snapshot. Apenas pares suficientemente próximos no tempo são usados.
+
+### Métricas
+
+O painel apresenta:
+
+- amostras elegíveis;
+- taxa de toque;
+- taxa de rejeição entre toques;
+- taxa de rompimento entre toques;
+- mediana de minutos até o primeiro toque.
+
+O objetivo é **validar o comportamento histórico do modelo**, não otimizar parâmetros para encaixar o passado.
+
+## 17. Recibos reproduzíveis
+
+Cada recibo do Stress Lab salva:
+
+- tipo de análise;
+- versão do modelo;
+- data/hora de criação;
+- snapshot de origem;
+- versão do snapshot;
+- expiry;
+- parâmetros de spot/IV/tempo;
+- métricas-base;
+- resultado do cenário.
+
+Os recibos são guardados em `localStorage` do navegador, com limite atual de 50 registros, e podem ser:
+
+- reproduzidos;
+- exportados individualmente em JSON;
+- exportados em lote.
+
+Limpar os dados do navegador pode apagar os recibos locais. Exportação JSON é a forma persistente recomendada.
+
+## 18. Ajuda contextual
+
+O dashboard usa `docs/help.js` como catálogo educativo.
+
+Cada seção marcada com `data-help` recebe um ícone de informação que abre um modal com:
+
+- o que a seção mostra;
+- como interpretar;
+- cuidados e limitações;
+- link para o guia didático completo.
+
+Esse mecanismo é independente dos cálculos e pode ser ampliado para novas seções sem duplicar textos no HTML.
+
+## 19. Snapshot v5
+
+A partir do snapshot v5, os perfis por vencimento também podem preservar o ranking `pinning` calculado no coletor.
+
+Snapshots anteriores continuam compatíveis: o front-end consegue derivar o ranking a partir de GEX/OI armazenados quando necessário.
