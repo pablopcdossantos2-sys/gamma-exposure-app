@@ -226,7 +226,7 @@ function chartHeatmap(){
   var svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,width:W,height:H,role:"img","aria-label":"Heatmap GEX por strike e vencimento"},host);
   var valueMap={},maxAbs=1;
   profiles.forEach(function(p,pi){
-    var by={};(p.strikes||[]).forEach(function(s){by[s.k]=s;maxAbs=Math.max(maxAbs,Math.abs(s.net||0))});
+    var by={};(p.strikes||[]).forEach(function(s){by[s.k]=s;if(s.k>=lo&&s.k<=hi)maxAbs=Math.max(maxAbs,Math.abs(s.net||0))});
     valueMap[pi]=by
   });
   profiles.forEach(function(p,pi){
