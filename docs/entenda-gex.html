@@ -22,24 +22,24 @@
   </header>
 
   <section class="lesson-grid lesson-grid-3">
-    <article class="lesson-card">
+    <article class="lesson-card" data-help="guide-delta">
       <span class="lesson-step">1</span>
       <h2>Comece pelo Delta</h2>
       <p>Delta mede quanto o preço de uma opção tende a variar quando o ativo-objeto se move. Também é uma aproximação da exposição direcional da opção naquele instante.</p>
     </article>
-    <article class="lesson-card">
+    <article class="lesson-card" data-help="guide-gamma">
       <span class="lesson-step">2</span>
       <h2>Depois, Gamma</h2>
       <p>Gamma mede quanto o <strong>delta muda</strong> quando o preço do ativo muda. Quanto maior o gamma, mais rapidamente o hedge delta precisa ser reajustado.</p>
     </article>
-    <article class="lesson-card">
+    <article class="lesson-card" data-help="guide-gex">
       <span class="lesson-step">3</span>
       <h2>Então, GEX</h2>
       <p>Gamma Exposure agrega essa sensibilidade usando gamma, open interest, multiplicador do contrato e preço do ativo. O resultado tenta estimar a relevância potencial dos ajustes de hedge.</p>
     </article>
   </section>
 
-  <section class="card guide-section">
+  <section class="card guide-section" data-help="guide-regimes">
     <p class="section-kicker">A ideia central</p>
     <h2>O que muda entre gamma positivo e negativo?</h2>
     <div class="regime-compare">
@@ -63,7 +63,7 @@
     <div class="guide-callout"><strong>Importante:</strong> isso descreve um mecanismo potencial de hedge, não uma regra garantida. O posicionamento real dos dealers não é totalmente observável e diferentes modelos de GEX usam premissas diferentes.</div>
   </section>
 
-  <section class="card guide-section">
+  <section class="card guide-section" data-help="guide-chart">
     <p class="section-kicker">Mapa por strike</p>
     <h2>Como ler o gráfico de Gamma Exposure</h2>
     <div class="gex-demo" aria-label="Exemplo esquemático de GEX por strike">
@@ -77,27 +77,27 @@
   </section>
 
   <section class="lesson-grid lesson-grid-2">
-    <article class="lesson-card accent-blue">
+    <article class="lesson-card accent-blue" data-help="guide-callwall">
       <h2>Call Wall</h2>
       <p>É o strike com maior concentração de GEX de calls segundo nosso cálculo. Pode funcionar como uma região estrutural de resistência ou contenção, especialmente quando o preço se aproxima dela.</p>
       <p class="lesson-note">Não significa que o preço “não pode” ultrapassar o nível.</p>
     </article>
-    <article class="lesson-card accent-orange">
+    <article class="lesson-card accent-orange" data-help="guide-putwall">
       <h2>Put Wall</h2>
       <p>É o strike com maior magnitude de GEX de puts. Pode funcionar como região estrutural de suporte ou contenção em movimentos de queda.</p>
       <p class="lesson-note">Também não é uma barreira garantida.</p>
     </article>
-    <article class="lesson-card accent-purple">
+    <article class="lesson-card accent-purple" data-help="guide-flip">
       <h2>Gamma Flip</h2>
       <p>É o preço teórico no qual o GEX agregado cruza zero. Ele separa dois regimes do modelo: de um lado, hedge potencialmente amortecedor; do outro, potencialmente amplificador.</p>
     </article>
-    <article class="lesson-card accent-cyan">
+    <article class="lesson-card accent-cyan" data-help="guide-maxgex">
       <h2>Maior |GEX|</h2>
       <p>É o strike com maior exposição líquida absoluta. Ele destaca onde a concentração estrutural é mais forte, independentemente de o sinal ser positivo ou negativo.</p>
     </article>
   </section>
 
-  <section class="card guide-section">
+  <section class="card guide-section" data-help="guide-projection">
     <p class="section-kicker">Do EWZ para o WIN</p>
     <h2>Por que projetamos os níveis no WIN?</h2>
     <p class="guide-copy">As opções que estamos analisando pertencem ao <strong>EWZ</strong>. Como o objetivo operacional é observar o mini-índice brasileiro, o sistema cria uma projeção de referência usando preços coincidentes de EWZ e WIN:</p>
@@ -108,7 +108,7 @@
     <p class="guide-copy">Essa transformação serve para transportar a <strong>posição relativa</strong> dos níveis para o gráfico do WIN. Ela não transforma EWZ e WIN em instrumentos economicamente equivalentes e pode sofrer efeito de câmbio, basis, horário e diferenças entre os dois mercados.</p>
   </section>
 
-  <section class="card guide-section">
+  <section class="card guide-section" data-help="guide-routine">
     <p class="section-kicker">Rotina prática</p>
     <h2>Como usar o dashboard sem transformar GEX em “sinal mágico”</h2>
     <ol class="guide-steps">
@@ -121,7 +121,7 @@
     </ol>
   </section>
 
-  <section class="card guide-section">
+  <section class="card guide-section" data-help="guide-misreads">
     <p class="section-kicker">Erros de interpretação</p>
     <h2>O que o GEX não diz</h2>
     <div class="myth-grid">
@@ -132,7 +132,7 @@
     </div>
   </section>
 
-  <section class="card guide-section">
+  <section class="card guide-section" data-help="guide-glossary">
     <p class="section-kicker">Glossário rápido</p>
     <div class="glossary">
       <div><dt>Strike</dt><dd>Preço de exercício da opção.</dd></div>
@@ -144,7 +144,7 @@
     </div>
   </section>
 
-  <section class="card guide-section references">
+  <section class="card guide-section references" data-help="guide-sources">
     <p class="section-kicker">Referências para aprofundamento</p>
     <h2>Fontes conceituais</h2>
     <p>Este guia foi escrito para explicar o modelo usado pela ferramenta e deve ser lido junto das limitações metodológicas. Para aprofundar:</p>
@@ -158,5 +158,6 @@
 
   <p class="guide-disclaimer">Material educacional. GEX é uma ferramenta de contexto de mercado e não constitui recomendação de investimento.</p>
 </main>
+<script src="help.js"></script>
 </body>
 </html>

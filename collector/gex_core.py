@@ -400,6 +400,43 @@ def oi_delta_by_strike(previous_strikes, current_strikes):
     return out
 
 
+def pinning_scores(spot, contracts):
+    """Heuristic Gamma Gravity ranking for one expiry.
+
+    Combines absolute gamma concentration, total OI, proximity to spot and
+    time-to-expiry. Scores are normalized 0-100 within the expiry.
+    This is a structural heuristic, not a price forecast.
+    """
+    if not contracts:
+        return []
+    by_gex = gex_by_strike(spot, contracts)
+    side = side_metrics_by_strike(contracts)
+    dte = min((c.get("dte", 0) for c in contracts), default=0)
+    time_weight = 1.0 / math.sqrt(max(dte, 0.5))
+    rows = []
+    for strike, g in by_gex.items():
+        sm = side.get(strike, {})
+        oi = float(sm.get("oi_call", 0) or 0) + float(sm.get("oi_put", 0) or 0)
+        gamma_abs = abs(g.get("call", 0.0)) + abs(g.get("put", 0.0))
+        distance_pct = abs(strike / spot - 1.0) if spot else 1.0
+        proximity = math.exp(-distance_pct / 0.03)
+        raw = (max(gamma_abs, 1.0) ** 0.60) * math.sqrt(oi + 1.0) * proximity * time_weight
+        rows.append({
+            "k": strike,
+            "raw": raw,
+            "distance_pct": distance_pct * 100.0,
+            "oi": round(oi),
+            "abs_gex": round(gamma_abs),
+        })
+    max_raw = max((r["raw"] for r in rows), default=1.0) or 1.0
+    for r in rows:
+        r["score"] = round(r["raw"] / max_raw * 100.0, 2)
+        r["distance_pct"] = round(r["distance_pct"], 3)
+        r.pop("raw", None)
+    rows.sort(key=lambda r: r["score"], reverse=True)
+    return rows[:10]
+
+
 def compute(spot, contracts):
     """Retorna niveis GEX e exposicoes avancadas para o conjunto informado."""
     by = gex_by_strike(spot, contracts)
@@ -450,6 +487,7 @@ def compute(spot, contracts):
         result["max_pain_payout"] = round(payout) if payout is not None else None
         result.update(expected_move(spot, contracts))
         result.update(iv_skew_metrics(spot, contracts))
+        result["pinning"] = pinning_scores(spot, contracts)
     else:
         result.update({
             "max_pain": None,
@@ -468,6 +506,7 @@ def compute(spot, contracts):
             "put25_strike": None,
             "rr25_vol_points": None,
             "bf25_vol_points": None,
+            "pinning": [],
         })
     return result
 

@@ -120,5 +120,19 @@ class GexCoreTests(unittest.TestCase):
         self.assertIn(q["status"], {"ok", "warning"})
 
 
+    def test_pinning_scores_are_ranked_and_normalized(self):
+        rows = gex_core.pinning_scores(self.spot, self.contracts)
+        self.assertTrue(rows)
+        self.assertEqual(rows[0]["score"], 100.0)
+        self.assertTrue(all(0 <= r["score"] <= 100 for r in rows))
+        self.assertEqual(rows, sorted(rows, key=lambda r: r["score"], reverse=True))
+        self.assertTrue(all("distance_pct" in r and "oi" in r and "abs_gex" in r for r in rows))
+
+    def test_compute_single_expiry_contains_pinning(self):
+        res = gex_core.compute(self.spot, self.contracts)
+        self.assertIn("pinning", res)
+        self.assertTrue(res["pinning"])
+
+
 if __name__ == "__main__":
     unittest.main()

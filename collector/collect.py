@@ -174,7 +174,7 @@ def archive_snapshot(latest, outdir, now):
 
     snap = dict(latest)
     snap.pop("curve", None)
-    snap["snapshot_version"] = 4
+    snap["snapshot_version"] = 5
     snap["snapshot_timezone"] = "America/Sao_Paulo"
 
     rel_file = f"data/gex-snapshots/{day}/{hhmmss}.json"
@@ -205,7 +205,7 @@ def archive_snapshot(latest, outdir, now):
         "cboe_timestamp": latest.get("cboe_timestamp"),
         "distance_to_win_open_minutes": round(abs(minute - WIN_OPEN_MINUTE), 2),
         "is_win_open_reference": False,
-        "snapshot_version": latest.get("snapshot_version", 4),
+        "snapshot_version": latest.get("snapshot_version", 5),
         "quality_status": (latest.get("quality") or {}).get("status"),
         "source_age_seconds": (latest.get("quality") or {}).get("source_age_seconds"),
     })
@@ -263,7 +263,7 @@ def main():
         "cboe_timestamp": raw["data"].get("timestamp") or raw.get("timestamp"),
         "max_dte": a.max_dte,
         "raw_file": raw_file,
-        "snapshot_version": 4,
+        "snapshot_version": 5,
         "expiry_profiles": expiry_profiles,
         "term_structure": term_structure,
         "quality": quality,
