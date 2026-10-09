@@ -400,6 +400,22 @@ def oi_delta_by_strike(previous_strikes, current_strikes):
     return out
 
 
+def put_call_metrics(contracts):
+    """Aggregate put/call ratios for OI and cumulative volume."""
+    call_oi = sum(float(c.get("oi", 0) or 0) for c in contracts if c.get("cp") == "C")
+    put_oi = sum(float(c.get("oi", 0) or 0) for c in contracts if c.get("cp") == "P")
+    call_volume = sum(float(c.get("volume", 0) or 0) for c in contracts if c.get("cp") == "C")
+    put_volume = sum(float(c.get("volume", 0) or 0) for c in contracts if c.get("cp") == "P")
+    return {
+        "call_oi": round(call_oi),
+        "put_oi": round(put_oi),
+        "put_call_oi_ratio": round(put_oi / call_oi, 4) if call_oi > 0 else None,
+        "call_volume": round(call_volume),
+        "put_volume": round(put_volume),
+        "put_call_volume_ratio": round(put_volume / call_volume, 4) if call_volume > 0 else None,
+    }
+
+
 def pinning_scores(spot, contracts):
     """Heuristic Gamma Gravity ranking for one expiry.
 
@@ -479,6 +495,7 @@ def compute(spot, contracts):
         "curve": [{"s": round(s, 4), "gex": round(g)} for s, g in curve],
         "n_contracts": len(contracts),
         **{k: round(v) for k, v in adv_totals.items()},
+        **put_call_metrics(contracts),
     }
 
     if len(expirations) == 1:
