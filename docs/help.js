@@ -147,6 +147,18 @@ var TOPICS={
     interpret:"Use como roteiro de leitura para entender o que merece atenção antes de examinar os gráficos em detalhe.",
     caution:"O texto é determinístico, não uma previsão de IA. Ele descreve o estado atual e não recomenda compra, venda ou direção futura."
   },
+  "price-confluence":{
+    title:"ATR, RSI e Bandas de Bollinger",
+    what:"Calcula indicadores clássicos apenas sobre os candles de EWZ ou WIN selecionados. ATR mede amplitude média, RSI mede força relativa e Bollinger mostra preço em relação à média e dispersão recente.",
+    interpret:"Use como confluência independente: ATR ajuda a dimensionar volatilidade realizada, RSI mostra posição relativa do momentum e Bollinger mostra compressão/expansão e distância da média.",
+    caution:"Nenhum indicador entra no cálculo de GEX. Sobrecompra/sobrevenda não significa reversão automática, e bandas não são suportes/resistências garantidos."
+  },
+  "weighting-models":{
+    title:"OI-weighted × Volume-weighted Gamma",
+    what:"Compara duas lentes diferentes: GEX por open interest representa inventário aberto; o proxy por volume pondera gamma pela atividade acumulada da sessão.",
+    interpret:"Compare principalmente a forma, os strikes dominantes e a correlação entre os perfis. Divergência pode indicar atividade recente concentrada em regiões diferentes do estoque de OI.",
+    caution:"Volume não é posição aberta e não deve ser somado ao OI. O proxy volume-weighted não identifica comprador/vendedor nem posição dealer real."
+  },
   "guide-delta":{
     title:"Delta",
     what:"Delta mede a sensibilidade do preço da opção a uma pequena variação do ativo e funciona também como aproximação de exposição direcional.",
