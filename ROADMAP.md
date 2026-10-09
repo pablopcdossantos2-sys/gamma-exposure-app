@@ -30,47 +30,8 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 - KPIs, Walls, Flip, gráfico por strike e overlays de EWZ/WIN passam a usar o expiry escolhido;
 - snapshots legados continuam funcionando em modo agregado.
 
----
 
-# Próximos blocos — dados gratuitos
-
-## A3 — Mapa temporal Time × Strike
-**Prioridade:** alta.
-
-Criar um heatmap histórico com:
-- eixo X = horário dos snapshots;
-- eixo Y = strike;
-- cor = GEX líquido;
-- trilhas visuais de Call Wall, Put Wall e Gamma Flip ao longo do pregão;
-- destaque da abertura do WIN.
-
-**Objetivo:** enxergar deslocamento intradiário das concentrações de gamma sem precisar abrir snapshot por snapshot.
-
-## A4 — Max Pain + Expected Move
-**Prioridade:** alta.
-
-Adicionar:
-- Max Pain por vencimento e agregado;
-- expected move derivado da IV;
-- bandas esperadas no EWZ;
-- projeção das bandas para WIN;
-- comparação com Walls/Flip.
-
-**Dados:** OI, IV, spot e vencimento do CBOE.
-
----
-
-## B1 — DEX + Vanna + Charm
-**Prioridade:** alta.
-
-Calcular por strike e vencimento:
-- Delta Exposure (DEX);
-- Vanna Exposure;
-- Charm Exposure;
-- agregados e níveis extremos;
-- overlays opcionais no EWZ/WIN.
-
-**Regra:** manter fórmulas, sinais e premissas claramente documentados.
+#---
 
 ## B2 — IV Skew + Term Structure
 **Prioridade:** alta.
@@ -268,23 +229,17 @@ Componentes planejados:
 # Sequência sugerida
 
 ### Próximo bloco recomendado
-**A3 + A4 + B5**
-- mapa temporal;
-- Max Pain/Expected Move;
-- ΔOI.
-
-### Depois
-**B1 + B2 + C2**
-- DEX/Vanna/Charm;
+**B2 + B5 + C2**
 - IV skew/term structure;
+- ΔOI entre sessões;
 - qualidade/freshness.
 
-### Laboratório quantitativo
+### Depois
 **B3 + B4 + C1 + D2**
-- Wind Tunnel;
+- Stress Lab / Wind Tunnel;
 - pinning;
 - validação histórica;
-- reprodutibilidade.
+- replay reproduzível.
 
 ### Camadas opcionais
 **B6 + B7 + C3 + C4 + C5 + D1**
