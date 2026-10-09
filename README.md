@@ -19,6 +19,21 @@ nível WIN = nível EWZ × razão
 
 O valor é arredondado ao múltiplo de 5 mais próximo. A página também permite um ajuste manual opcional do WIN.
 
+## Visualização configurável das regiões de GEX
+
+Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:
+
+- **Somente níveis principais** — padrão da ferramenta. Mostra Call Wall, Put Wall, Gamma Flip quando existir, preço de referência e maior |GEX|.
+- **Faixas graduadas por intensidade** — substitui as linhas principais por bandas horizontais cuja opacidade cresce conforme a magnitude de `|GEX|`.
+- **Níveis + faixas de intensidade** — combina as duas leituras.
+
+Quando as faixas estiverem ativadas, também é possível escolher:
+
+- quantas regiões de maior `|GEX|` mostrar: Top 3, Top 5, Top 7 ou Top 10;
+- intensidade visual: suave, média ou forte.
+
+Essas preferências são salvas no `localStorage` do navegador. O botão **Restaurar padrão** retorna para “Somente níveis principais”, Top 7 e intensidade média.
+
 ## Fontes
 
 - **Gamma Exposure:** chain de opções do CBOE, com cálculo próprio em `collector/gex_core.py`.
