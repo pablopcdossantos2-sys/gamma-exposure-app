@@ -980,7 +980,7 @@ function atrSeries(bars,n){
   if(bars.length<n)return out;var a=tr.slice(0,n).reduce(function(x,y){return x+y},0)/n;out[n-1]=a;for(var i=n;i<tr.length;i++){a=(a*(n-1)+tr[i])/n;out[i]=a}return out
 }
 function rsiSeries(bars,n){
-  var out=new Array(bars.length).fill(null);if(bars.length<=n)return out,g=0,l=0;
+  var out=new Array(bars.length).fill(null);if(bars.length<=n)return out;var g=0,l=0;
   for(var i=1;i<=n;i++){var d=bars[i].c-bars[i-1].c;if(d>=0)g+=d;else l-=d}g/=n;l/=n;out[n]=l===0?100:100-100/(1+g/l);
   for(var k=n+1;k<bars.length;k++){var d2=bars[k].c-bars[k-1].c,gg=Math.max(d2,0),ll=Math.max(-d2,0);g=(g*(n-1)+gg)/n;l=(l*(n-1)+ll)/n;out[k]=l===0?100:100-100/(1+g/l)}return out
 }
