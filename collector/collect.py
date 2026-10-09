@@ -248,10 +248,12 @@ def main():
             json.dump(raw, f)
 
     spot, contracts = gex_core.parse_chain(raw["data"], max_dte=a.max_dte)
+    _, activity_contracts = gex_core.parse_chain(raw["data"], max_dte=a.max_dte, include_zero_oi=True)
     if not contracts:
         raise RuntimeError("Chain vazia apos filtros.")
     res = gex_core.compute(spot, contracts)
-    expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts)
+    gex_core.merge_activity_metrics(res, activity_contracts)
+    expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts, activity_contracts=activity_contracts)
     term_structure = gex_core.compute_term_structure(expiry_profiles)
     source_timestamp = raw["data"].get("timestamp") or raw.get("timestamp")
     quality = assess_quality(raw["data"], contracts, now, source_timestamp=source_timestamp)
