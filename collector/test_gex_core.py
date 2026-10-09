@@ -134,5 +134,22 @@ class GexCoreTests(unittest.TestCase):
         self.assertTrue(res["pinning"])
 
 
+    def test_put_call_metrics(self):
+        m = gex_core.put_call_metrics(self.contracts)
+        self.assertEqual(m["call_oi"], 340)
+        self.assertEqual(m["put_oi"], 360)
+        self.assertAlmostEqual(m["put_call_oi_ratio"], 360/340, places=4)
+        self.assertEqual(m["call_volume"], 82)
+        self.assertEqual(m["put_volume"], 88)
+        self.assertAlmostEqual(m["put_call_volume_ratio"], 88/82, places=4)
+
+    def test_compute_contains_put_call_ratios(self):
+        res = gex_core.compute(self.spot, self.contracts)
+        self.assertIn("put_call_oi_ratio", res)
+        self.assertIn("put_call_volume_ratio", res)
+        self.assertGreater(res["put_call_oi_ratio"], 0)
+        self.assertGreater(res["put_call_volume_ratio"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
