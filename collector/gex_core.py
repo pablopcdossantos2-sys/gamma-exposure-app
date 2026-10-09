@@ -202,7 +202,7 @@ def expected_move(spot, contracts):
 
     def mid(row):
         bid, ask, last = row.get("bid", 0.0), row.get("ask", 0.0), row.get("last", 0.0)
-        if ask > 0 and bid >= 0 and ask >= bid:
+        if ask > 0 and bid > 0 and ask >= bid:
             m = (bid + ask) / 2.0
             if m > 0:
                 return m
