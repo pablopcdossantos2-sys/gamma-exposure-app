@@ -122,6 +122,90 @@ var TOPICS={
     what:"Resumo conceitual de gamma positivo/negativo, Call Wall e Put Wall.",
     interpret:"Gamma positivo tende a ser associado a hedge amortecedor; gamma negativo pode favorecer amplificação. Walls são concentrações, não barreiras.",
     caution:"Esses efeitos são probabilísticos e dependem da hipótese de posicionamento dealer e de outras forças de mercado."
+  },
+  "guide-delta":{
+    title:"Delta",
+    what:"Delta mede a sensibilidade do preço da opção a uma pequena variação do ativo e funciona também como aproximação de exposição direcional.",
+    interpret:"Calls normalmente têm delta positivo; puts, negativo. Valores mais próximos de ±1 indicam maior sensibilidade ao movimento do ativo.",
+    caution:"Delta muda com preço, IV e tempo. Ele não é constante — justamente por isso gamma é importante."
+  },
+  "guide-gamma":{
+    title:"Gamma",
+    what:"Gamma mede quanto o delta muda quando o preço do ativo se move.",
+    interpret:"Gamma alto significa que a necessidade de ajuste do hedge delta pode mudar rapidamente conforme o ativo se desloca.",
+    caution:"Gamma é apenas uma sensibilidade. O efeito real no mercado depende do tamanho das posições e de quem está comprado/vendido nas opções."
+  },
+  "guide-gex":{
+    title:"Gamma Exposure",
+    what:"GEX agrega gamma, open interest, multiplicador do contrato e preço para estimar a relevância potencial do hedge por strike.",
+    interpret:"Use GEX para mapear concentração estrutural e pensar em regimes de volatilidade, não como previsão direcional isolada.",
+    caution:"A posição real dos dealers não é pública; o sinal depende de convenções de modelagem."
+  },
+  "guide-regimes":{
+    title:"Gamma positivo e negativo",
+    what:"Compara dois regimes teóricos de hedge: um potencialmente amortecedor e outro potencialmente amplificador.",
+    interpret:"Gamma positivo costuma ser associado a venda na alta/compra na baixa por hedge; gamma negativo pode exigir compra na alta/venda na baixa.",
+    caution:"É um mecanismo potencial, não uma regra. Fluxo, liquidez, macro e posicionamento real podem dominar o efeito."
+  },
+  "guide-chart":{
+    title:"Leitura do gráfico de GEX",
+    what:"O gráfico organiza a exposição por strike e separa calls, puts e resultado líquido.",
+    interpret:"Concentre-se em magnitude relativa, proximidade do spot e persistência dos níveis entre snapshots.",
+    caution:"Barras grandes não significam necessariamente que o preço será atraído ou rejeitado por aquele strike."
+  },
+  "guide-callwall":{
+    title:"Call Wall",
+    what:"Strike com maior concentração de GEX de calls no modelo.",
+    interpret:"Pode funcionar como região estrutural importante acima ou perto do preço, especialmente quando persiste entre snapshots.",
+    caution:"Não é teto garantido e pode se deslocar com preço, IV e mudanças de posicionamento."
+  },
+  "guide-putwall":{
+    title:"Put Wall",
+    what:"Strike com maior magnitude de GEX de puts no modelo.",
+    interpret:"Pode atuar como região estrutural relevante abaixo ou perto do preço.",
+    caution:"Não é suporte garantido. Rompimentos são possíveis e devem ser estudados no scorecard histórico."
+  },
+  "guide-flip":{
+    title:"Gamma Flip",
+    what:"Preço teórico em que o GEX agregado cruza zero.",
+    interpret:"Ajuda a pensar em mudança de regime entre hedge potencialmente amortecedor e amplificador.",
+    caution:"O Flip depende da modelagem de gamma e IV. Se não houver cruzamento na faixa calculada, ele pode ficar ausente."
+  },
+  "guide-maxgex":{
+    title:"Maior |GEX|",
+    what:"Strike com a maior exposição líquida absoluta.",
+    interpret:"Destaca a concentração estrutural mais forte independentemente do sinal.",
+    caution:"Maior magnitude não equivale a maior probabilidade de toque ou fechamento."
+  },
+  "guide-projection":{
+    title:"Projeção EWZ → WIN",
+    what:"Converte níveis do EWZ para pontos do WIN usando uma razão de preços alinhados no tempo.",
+    interpret:"Serve para transportar referências estruturais do mercado de opções do EWZ para o ativo que queremos observar operacionalmente.",
+    caution:"É uma aproximação. Câmbio, basis, horários e diferenças econômicas entre EWZ e WIN impedem equivalência perfeita."
+  },
+  "guide-routine":{
+    title:"Rotina de uso",
+    what:"Organiza uma sequência de leitura: snapshot, regime, níveis, posição do preço e confirmação pelo comportamento real do mercado.",
+    interpret:"Trate GEX como contexto. Uma boa leitura combina estrutura das opções com preço, volatilidade e outros dados disponíveis.",
+    caution:"Evite transformar uma sequência didática em sistema mecânico de entrada sem validação histórica."
+  },
+  "guide-misreads":{
+    title:"Erros comuns",
+    what:"Reúne interpretações que parecem intuitivas, mas não são suportadas pelo modelo.",
+    interpret:"Use a seção como checklist mental antes de concluir que GEX positivo significa alta ou que uma Wall nunca rompe.",
+    caution:"Modelos estruturais ficam perigosos quando convertidos em certezas. A principal defesa é separar hipótese, dado e conclusão."
+  },
+  "guide-glossary":{
+    title:"Glossário",
+    what:"Resume os termos mínimos necessários para navegar no dashboard.",
+    interpret:"Use-o como referência rápida enquanto aprende Delta, Gamma, OI, strikes e snapshots.",
+    caution:"Definições curtas simplificam conceitos. Consulte a metodologia para fórmulas e premissas completas."
+  },
+  "guide-sources":{
+    title:"Fontes conceituais",
+    what:"Aponta materiais externos e a metodologia própria do projeto para aprofundamento.",
+    interpret:"Compare explicações de diferentes fontes e dê preferência às fórmulas/documentação do projeto para entender exatamente o que o dashboard calcula.",
+    caution:"Projetos e fornecedores diferentes podem usar convenções de GEX distintas; resultados não são automaticamente comparáveis."
   }
 };
 
