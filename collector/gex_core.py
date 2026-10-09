@@ -38,8 +38,14 @@ def parse_chain(data, today=None, max_dte=None):
         if oi <= 0:
             continue
         out.append(dict(cp=m["cp"], strike=int(m["k"]) / 1000.0, dte=dte,
+                        expiration=exp.isoformat(),
                         t=max(dte, 0.5) / 365.0, iv=float(o.get("iv") or 0),
-                        gamma=float(o.get("gamma") or 0), oi=oi))
+                        gamma=float(o.get("gamma") or 0), oi=oi,
+                        volume=float(o.get("volume") or 0),
+                        delta=float(o.get("delta") or 0),
+                        bid=float(o.get("bid") or 0),
+                        ask=float(o.get("ask") or 0),
+                        last=float(o.get("last_trade_price") or 0)))
     return spot, out
 
 
@@ -100,3 +106,27 @@ def compute(spot, contracts):
         "curve": [{"s": round(s, 4), "gex": round(g)} for s, g in curve],
         "n_contracts": len(contracts),
     }
+
+
+def compute_expiry_profiles(spot, contracts):
+    """Calcula o mesmo mapa de GEX separadamente para cada vencimento.
+
+    Os perfis sao armazenados no snapshot para permitir heatmap strike x expiry
+    e filtros por vencimento no dashboard. A curva completa de 161 pontos nao e
+    repetida por expiry para manter os arquivos menores.
+    """
+    groups = {}
+    for contract in contracts:
+        expiry = contract.get("expiration") or f"DTE-{contract.get('dte', 0)}"
+        groups.setdefault(expiry, []).append(contract)
+
+    profiles = []
+    for expiry, rows in sorted(groups.items()):
+        profile = compute(spot, rows)
+        profile.pop("curve", None)
+        profile["expiration"] = expiry
+        profile["dte"] = min((r.get("dte", 0) for r in rows), default=0)
+        profile["volume"] = round(sum(r.get("volume", 0) for r in rows))
+        profile["open_interest"] = round(sum(r.get("oi", 0) for r in rows))
+        profiles.append(profile)
+    return profiles
