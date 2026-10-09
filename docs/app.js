@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,prices:null,range:.15,manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",chartViews:{ewz:null,win:null}};
+var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",chartViews:{ewz:null,win:null}};
 var dragState=null,dragRAF=null;
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -15,14 +15,30 @@ function usd(v){if(v==null)return"—";var a=Math.abs(v),s=v<0?"−":"";if(a>=1e
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}}
 function lastBars(key){var p=state.prices&&state.prices[key];return p&&p.bars&&p.bars.length?p.bars:[]}
 function lastClose(key){var b=lastBars(key);return b.length?b[b.length-1].c:null}
+function targetGexTime(){
+  var t=state.gex&&Date.parse(state.gex.generated_at);
+  return isFinite(t)?Math.floor(t/1000):null
+}
+function nearestAlignedPair(target){
+  var eb=lastBars("ewz"),wb=lastBars("win");
+  if(!eb.length||!wb.length)return null;
+  var winByTime={};wb.forEach(function(b){winByTime[b.t]=b});
+  var best=null,bestDist=Infinity;
+  eb.forEach(function(e){
+    var w=winByTime[e.t];if(!w)return;
+    var dist=target==null?Math.abs(e.t-eb[eb.length-1].t):Math.abs(e.t-target);
+    if(dist<bestDist){bestDist=dist;best={t:e.t,ewz:e,win:w,dist:dist}}
+  });
+  return best
+}
 function conversionRatio(){
-  var eb=lastBars("ewz"),wb=lastBars("win"),ewz=eb.length?eb[eb.length-1].c:null;
+  var pair=nearestAlignedPair(targetGexTime());
+  var ewz=pair?pair.ewz.c:lastClose("ewz");
   if(!ewz)return null;
   if(state.manualWin&&state.manualWin>0)return state.manualWin/ewz;
-  if(!wb.length)return null;
-  var winByTime={};wb.slice(-220).forEach(function(b){winByTime[b.t]=b.c});
-  for(var i=eb.length-1;i>=Math.max(0,eb.length-220);i--){if(winByTime[eb[i].t])return winByTime[eb[i].t]/eb[i].c}
-  return wb[wb.length-1].c/ewz
+  if(pair)return pair.win.c/pair.ewz.c;
+  var win=lastClose("win");
+  return win?win/ewz:null
 }
 function toWin(v){var r=conversionRatio();return v==null||!r?null:Math.round(v*r/WIN_TICK)*WIN_TICK}
 function niceTicks(min,max,n){var span=max-min||1,step=Math.pow(10,Math.floor(Math.log10(span/n))),err=span/n/step;step*=err>=7.5?10:err>=3.5?5:err>=1.5?2:1;var out=[],v=Math.ceil(min/step)*step;for(;v<=max+step*1e-6;v+=step)out.push(Math.abs(v)<step*1e-9?0:v);return out}
@@ -52,6 +68,75 @@ function renderHeader(){
   var ewzp=p&&p.ewz,winp=p&&p.win;
   $("ewzMeta").textContent="AMEX:EWZ"+(ewzp&&ewzp.last_bar_at?" · último candle "+new Date(ewzp.last_bar_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"")+(ewzp&&ewzp.stale?" · dados anteriores":"");
   $("winMeta").textContent="BMFBOVESPA:WIN1!"+(winp&&winp.last_bar_at?" · último candle "+new Date(winp.last_bar_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"")+(winp&&winp.stale?" · dados anteriores":"")
+}
+function snapshotEntries(){
+  return state.snapshotIndex&&Array.isArray(state.snapshotIndex.snapshots)?state.snapshotIndex.snapshots:[]
+}
+function currentSnapshotEntry(){
+  if(state.selectedSnapshot)return state.selectedSnapshot;
+  var ga=state.gex&&state.gex.generated_at;
+  return snapshotEntries().find(function(s){return s.generated_at===ga})||null
+}
+function renderSnapshotControls(){
+  var dateSel=$("snapshotDateSelect"),timeSel=$("snapshotTimeSelect");
+  if(!dateSel||!timeSel)return;
+  var entries=snapshotEntries(),current=currentSnapshotEntry();
+  if(!entries.length){
+    dateSel.innerHTML='<option>Sem histórico</option>';timeSel.innerHTML='<option>—</option>';
+    dateSel.disabled=true;timeSel.disabled=true;$("snapshotMeta").textContent="O histórico será criado nas próximas coletas.";return
+  }
+  dateSel.disabled=false;timeSel.disabled=false;
+  var dates=[];entries.forEach(function(e){if(dates.indexOf(e.local_date)<0)dates.push(e.local_date)});
+  dates.sort().reverse();
+  var desiredDate=current?current.local_date:dates[0];
+  dateSel.innerHTML="";
+  dates.forEach(function(d){var o=document.createElement("option");o.value=d;o.textContent=new Date(d+"T12:00:00").toLocaleDateString("pt-BR");dateSel.appendChild(o)});
+  dateSel.value=dates.indexOf(desiredDate)>=0?desiredDate:dates[0];
+  populateSnapshotTimes(dateSel.value,current&&current.local_date===dateSel.value?current.generated_at:null)
+}
+function populateSnapshotTimes(day,selectedGeneratedAt){
+  var timeSel=$("snapshotTimeSelect"),items=snapshotEntries().filter(function(e){return e.local_date===day}).sort(function(a,b){return a.local_time.localeCompare(b.local_time)});
+  timeSel.innerHTML="";
+  items.forEach(function(e){
+    var o=document.createElement("option");o.value=e.generated_at;
+    var hm=e.local_time.slice(0,5);
+    o.textContent=(e.is_win_open_reference?"★ ":"")+hm+(e.is_win_open_reference?" — abertura WIN":"");
+    timeSel.appendChild(o)
+  });
+  var chosen=items.find(function(e){return e.generated_at===selectedGeneratedAt})||items.find(function(e){return e.is_win_open_reference})||items[items.length-1];
+  if(chosen){timeSel.value=chosen.generated_at;updateSnapshotSummary(chosen)}
+}
+function updateSnapshotSummary(entry){
+  var badge=$("snapshotBadge"),title=$("snapshotTitle"),meta=$("snapshotMeta");
+  if(!entry){badge.textContent="Leitura atual";badge.classList.remove("opening");title.textContent="Mais recente";meta.textContent="Dados mais recentes disponíveis.";return}
+  badge.classList.toggle("opening",!!entry.is_win_open_reference);
+  badge.textContent=entry.is_win_open_reference?"★ Abertura WIN":"Histórico";
+  title.textContent=new Date(entry.local_date+"T12:00:00").toLocaleDateString("pt-BR")+" · "+entry.local_time.slice(0,5);
+  var cboe=entry.cboe_timestamp?" · dado CBOE: "+entry.cboe_timestamp:"";
+  meta.textContent="Coleta: "+entry.local_time+" BRT"+cboe+(entry.is_win_open_reference?" · snapshot disponível mais próximo de 09:00":"")
+}
+function focusChartsOnTimestamp(ts){
+  ["ewz","win"].forEach(function(key){
+    var bars=lastBars(key);if(!bars.length)return;
+    var target=Math.floor(Date.parse(ts)/1000),idx=0,best=Infinity;
+    bars.forEach(function(b,i){var d=Math.abs(b.t-target);if(d<best){best=d;idx=i}});
+    var v=chartView(key,bars.length),after=Math.round(v.count*.28);
+    v.end=clamp(idx+after,v.count,bars.length);v.yPan=0
+  })
+}
+function loadSnapshotEntry(entry){
+  if(!entry)return Promise.resolve();
+  return getJson(entry.file).then(function(d){
+    state.gex=d;state.selectedSnapshot=entry;focusChartsOnTimestamp(entry.generated_at);renderAll()
+  }).catch(function(err){
+    var b=$("errorBanner");b.hidden=false;b.textContent="Não foi possível carregar o snapshot selecionado: "+err.message
+  })
+}
+function selectLatestSnapshot(){
+  state.gex=state.liveLatest;state.selectedSnapshot=null;
+  var latest=snapshotEntries().find(function(e){return e.generated_at===state.liveLatest.generated_at});
+  if(latest)state.selectedSnapshot=latest;
+  resetChartView("ewz");resetChartView("win");renderAll()
 }
 function renderKpis(){
   var d=state.gex,b=$("kpis");b.innerHTML="";
@@ -223,6 +308,15 @@ function priceChart(id,key,mapper,legendId){
   bars.forEach(function(b,i){var xx=x(i),up=b.c>=b.o,col=up?cssVar("--green"):cssVar("--red");svgEl("line",{x1:xx,x2:xx,y1:y(b.h),y2:y(b.l),stroke:col,"stroke-width":1},plot);var top=y(Math.max(b.o,b.c)),bot=y(Math.min(b.o,b.c));svgEl("rect",{x:xx-bw/2,y:top,width:bw,height:Math.max(1,bot-top),fill:col,rx:.7},plot)});
   var multi=new Date(bars[0].t*1000).toDateString()!==new Date(bars[bars.length-1].t*1000).toDateString();
   for(var j=0;j<6;j++){var ix=Math.round((bars.length-1)*j/5);svgText(svg,x(ix),H-m.b+18,timeLabel(bars[ix].t,multi),{"text-anchor":j===0?"start":j===5?"end":"middle"})}
+  var targetTs=targetGexTime();
+  if(targetTs!=null){
+    var snapIx=0,snapDist=Infinity;
+    bars.forEach(function(b,i){var d=Math.abs(b.t-targetTs);if(d<snapDist){snapDist=d;snapIx=i}});
+    if(snapDist<=1800){
+      var sx=x(snapIx);svgEl("line",{x1:sx,x2:sx,y1:m.t,y2:H-m.b,stroke:cssVar("--purple"),"stroke-width":1.5,"stroke-dasharray":"5 4"},plot);
+      svgText(svg,sx+5,m.t+16,"GEX "+timeLabel(bars[snapIx].t,false),{class:"lbl",style:"fill:"+cssVar("--purple")})
+    }
+  }
   var cross=svgEl("line",{y1:m.t,y2:H-m.b,stroke:cssVar("--axis"),"stroke-width":1,visibility:"hidden"},svg);
   var hit=svgEl("rect",{x:m.l,y:m.t,width:plotW,height:plotH,class:"hit"},svg);
   hit.addEventListener("pointerdown",function(e){startChartDrag(e,key,plotW,plotH,all.length)});
@@ -248,7 +342,7 @@ function priceChart(id,key,mapper,legendId){
   legend(legendId,legendItems);viewStatus(key,all.length)
 }
 function renderPrices(){renderPrice("ewz");renderPrice("win")}
-function renderAll(){renderHeader();renderKpis();renderTable();renderViewControls();chartGex();renderPrices()}
+function renderAll(){renderHeader();renderKpis();renderTable();renderViewControls();renderSnapshotControls();chartGex();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
@@ -258,13 +352,25 @@ function init(){
   if(["low","medium","high"].indexOf(savedOpacity)>=0)state.zoneOpacity=savedOpacity;
   $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex()});
   document.querySelectorAll(".chart-tool").forEach(function(btn){btn.addEventListener("click",function(){adjustChartView(btn.getAttribute("data-chart"),btn.getAttribute("data-action"))})});
+  $("snapshotDateSelect").addEventListener("change",function(e){populateSnapshotTimes(e.target.value,null);var ga=$("snapshotTimeSelect").value,entry=snapshotEntries().find(function(s){return s.generated_at===ga});loadSnapshotEntry(entry)});
+  $("snapshotTimeSelect").addEventListener("change",function(e){var entry=snapshotEntries().find(function(s){return s.generated_at===e.target.value});loadSnapshotEntry(entry)});
+  $("latestSnapshotBtn").addEventListener("click",selectLatestSnapshot);
   $("gexViewMode").addEventListener("change",function(e){state.viewMode=e.target.value;store("gex.viewMode",state.viewMode);if(state.gex){renderViewControls();renderPrices()}});
   $("zoneCountSel").addEventListener("change",function(e){state.zoneCount=parseInt(e.target.value,10);store("gex.zoneCount",String(state.zoneCount));if(state.gex){renderViewControls();renderPrices()}});
   $("zoneOpacitySel").addEventListener("change",function(e){state.zoneOpacity=e.target.value;store("gex.zoneOpacity",state.zoneOpacity);if(state.gex){renderViewControls();renderPrices()}});
   $("resetViewBtn").addEventListener("click",function(){state.viewMode="levels";state.zoneCount=7;state.zoneOpacity="medium";store("gex.viewMode","levels");store("gex.zoneCount","7");store("gex.zoneOpacity","medium");if(state.gex){renderViewControls();renderPrices()}});
   $("winForm").addEventListener("submit",function(e){e.preventDefault();var raw=$("winInput").value.replace(/\./g,"").replace(",", "."),v=parseFloat(raw);state.manualWin=v>0?v:null;store("gex.manualWin",state.manualWin?String(state.manualWin):"");if(state.gex)renderAll()});
   $("autoBtn").addEventListener("click",function(){state.manualWin=null;$("winInput").value="";store("gex.manualWin","");if(state.gex)renderAll()});
-  Promise.all([getJson("data/latest.json"),getJson("data/prices.json").catch(function(){return null})]).then(function(r){state.gex=r[0];state.prices=r[1];renderAll();if(state.prices&&state.prices.errors&&state.prices.errors.length){var b=$("errorBanner");b.hidden=false;b.textContent="Aviso na coleta de preços: "+state.prices.errors.join(" · ")}}).catch(function(err){$("status").textContent="Não foi possível carregar o dashboard.";var b=$("errorBanner");b.hidden=false;b.textContent=err.message})
+  Promise.all([
+    getJson("data/latest.json"),
+    getJson("data/prices.json").catch(function(){return null}),
+    getJson("data/gex-snapshots/index.json").catch(function(){return {snapshots:[]}})
+  ]).then(function(r){
+    state.liveLatest=r[0];state.gex=r[0];state.prices=r[1];state.snapshotIndex=r[2];
+    state.selectedSnapshot=snapshotEntries().find(function(s){return s.generated_at===state.gex.generated_at})||null;
+    renderAll();
+    if(state.prices&&state.prices.errors&&state.prices.errors.length){var b=$("errorBanner");b.hidden=false;b.textContent="Aviso na coleta de preços: "+state.prices.errors.join(" · ")}
+  }).catch(function(err){$("status").textContent="Não foi possível carregar o dashboard.";var b=$("errorBanner");b.hidden=false;b.textContent=err.message})
 }
 init();
 })();
