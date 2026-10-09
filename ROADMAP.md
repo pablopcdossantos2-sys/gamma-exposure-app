@@ -127,11 +127,17 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 
 Diretório: `experimental/paid-data-architecture/`
 
-Mantém separados:
-1. stream oficial/real-time de opções EWZ;
-2. signed options flow;
-3. backfill histórico profundo;
-4. microestrutura WINFUT: trades, agressão e book.
+**Status arquitetural:** laboratório isolado implementado com mocks/testes; nenhum provider pago real conectado.
+
+Trilhas:
+1. **P1 — stream oficial/real-time de opções EWZ**: adapter contract, modelos normalizados, provenance, quality e pipeline preparados.
+2. **P2 — signed options flow**: classificação provider/proxy, signed delta flow, signed gamma flow e hedge-notional proxy implementados para eventos normalizados.
+3. **P3 — backfill histórico profundo**: interface historical, event store/replay e cost guard provider-neutral implementados.
+4. **P4 — microestrutura WINFUT**: eventos quote/trade/book, trade pressure e imbalance implementados para dados normalizados.
+
+CI próprio: `.github/workflows/paid-lab-selftest.yml`.
+
+Nada dessa arquitetura é importado pelo sistema gratuito ativo.
 
 ---
 
