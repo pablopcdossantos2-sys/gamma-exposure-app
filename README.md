@@ -207,6 +207,10 @@ O botão **C·Y** centraliza novamente o preço no eixo vertical sem alterar o z
 ## Estrutura
 
 ```
+local_app.py         servidor local e abertura automática do navegador
+Executar-Gamma-Exposure.bat
+executar-localmente.sh
+Tutorial-Execucao-Local-Windows.md
 collector/
   collect.py          coleta a chain do CBOE
   gex_core.py         calcula GEX, Gamma Flip e Walls
@@ -215,6 +219,7 @@ docs/
   index.html
   app.js
   help.js            catálogo de ajuda contextual
+  execucao-local.html tutorial web de execução local
   style.css
   data/
     latest.json       último GEX
@@ -237,16 +242,43 @@ O GitHub Actions roda em dias úteis, aproximadamente a cada 15 minutos durante 
 
 Os commits automáticos de dados **não disparam outra execução**, evitando loops do workflow.
 
-## Rodar localmente
+## Executar localmente
 
-```
-pip install -r collector/requirements.txt
-python collector/collect.py --save-raw
-python collector/collect_prices.py
-python -m http.server 8000 --directory docs
+A versão atual pode ser executada no computador do usuário sem Node.js, npm ou compilação frontend.
+
+### Windows — método recomendado
+
+1. instale Python 3 uma única vez;
+2. baixe o repositório em **Code → Download ZIP**;
+3. extraia a pasta;
+4. dê duplo clique em `Executar-Gamma-Exposure.bat`;
+5. escolha:
+   - **1 — Abrir com os dados já salvos**; ou
+   - **2 — Atualizar dados gratuitos e depois abrir**.
+
+O navegador é aberto automaticamente em um endereço local como `http://127.0.0.1:8000`.
+
+O tutorial completo para iniciantes está em:
+
+- [Tutorial-Execucao-Local-Windows.md](Tutorial-Execucao-Local-Windows.md)
+- [Executar localmente — versão web](docs/execucao-local.html)
+
+### Execução manual
+
+```powershell
+python local_app.py
 ```
 
-Depois abra `http://localhost:8000`.
+Para instalar as dependências de coleta e atualizar os dados antes de abrir:
+
+```powershell
+python -m pip install -r collector\requirements.txt
+python local_app.py --update-data
+```
+
+No macOS/Linux também existe `executar-localmente.sh`.
+
+O servidor usa `127.0.0.1` por padrão, portanto fica acessível somente no próprio computador. Se a porta 8000 estiver ocupada, o iniciador procura automaticamente a próxima porta disponível.
 
 ## Limitações
 

@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Executar localmente · Gamma Exposure</title>
+<meta name="description" content="Tutorial didático para executar o Gamma Exposure localmente no Windows sem conhecimento prévio de terminal ou compilação.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap guide-wrap">
+
+  <nav class="site-nav" aria-label="Navegação principal">
+    <a href="index.html">Dashboard</a>
+    <a href="entenda-gex.html">Entenda o GEX</a>
+    <a class="active" href="execucao-local.html">Executar localmente</a>
+  </nav>
+
+  <header class="guide-hero">
+    <p class="eyebrow">Tutorial para iniciantes</p>
+    <h1>Executar o Gamma Exposure no seu computador</h1>
+    <p class="guide-lead">Você não precisa saber compilar programas nem usar Git. A forma recomendada no Windows é: <strong>instalar Python uma vez, baixar o ZIP, extrair a pasta e dar duplo clique em um arquivo .bat</strong>.</p>
+  </header>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Antes de começar</p>
+    <h2>O que significa “executar localmente”?</h2>
+    <p>O dashboard continua abrindo no navegador, mas os arquivos são servidos pelo próprio computador. O endereço será parecido com <code>http://127.0.0.1:8000</code>. Esse endereço não publica o sistema na internet.</p>
+    <p>O projeto atual também <strong>não precisa de Node.js, npm ou compilação frontend</strong>. A interface é HTML/CSS/JavaScript e o Python fornece apenas o pequeno servidor local e, quando solicitado, os coletores.</p>
+  </section>
+
+  <section class="lesson-grid lesson-grid-3">
+    <article class="lesson-card">
+      <span class="lesson-step">1</span>
+      <h2>Instale Python</h2>
+      <p>Abra o PowerShell e execute <code>winget install -e --id Python.Python.3.12</code>. Depois feche e reabra o PowerShell.</p>
+    </article>
+    <article class="lesson-card">
+      <span class="lesson-step">2</span>
+      <h2>Baixe e extraia</h2>
+      <p>No GitHub, use <strong>Code → Download ZIP</strong>. Depois clique com o botão direito no ZIP e escolha <strong>Extrair Tudo</strong>.</p>
+    </article>
+    <article class="lesson-card">
+      <span class="lesson-step">3</span>
+      <h2>Dê duplo clique</h2>
+      <p>Na pasta extraída, abra <code>Executar-Gamma-Exposure.bat</code> e escolha a opção desejada.</p>
+    </article>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Menu do Windows</p>
+    <h2>Duas formas de abrir</h2>
+    <div class="lesson-grid lesson-grid-2">
+      <article class="lesson-card">
+        <h2>1 · Abrir com dados salvos</h2>
+        <p>É o modo mais rápido. Não instala bibliotecas extras e usa os JSON que já vieram no projeto. É útil para estudar o sistema mesmo sem atualizar a cadeia.</p>
+      </article>
+      <article class="lesson-card">
+        <h2>2 · Atualizar dados e abrir</h2>
+        <p>Cria automaticamente o ambiente <code>.venv-local</code>, instala as bibliotecas necessárias e tenta atualizar CBOE, EWZ e WIN antes de abrir.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Python pelo WinGet</p>
+    <h2>Instalação passo a passo</h2>
+    <ol class="guide-list">
+      <li>Pressione a tecla Windows e procure por <strong>PowerShell</strong>.</li>
+      <li>Abra o PowerShell.</li>
+      <li>Digite <code>python --version</code>.</li>
+      <li>Se Python 3 já aparecer, não é necessário instalar novamente.</li>
+      <li>Se não aparecer, execute <code>winget install -e --id Python.Python.3.12</code>.</li>
+      <li>Quando terminar, feche o PowerShell e abra de novo.</li>
+      <li>Confirme com <code>python --version</code> ou <code>py -3 --version</code>.</li>
+    </ol>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Durante o uso</p>
+    <h2>Por que aparece uma janela preta?</h2>
+    <p>Essa janela é o servidor local. <strong>Não a feche enquanto estiver usando o dashboard.</strong> O navegador pode ser fechado e aberto novamente, mas o servidor deve continuar ativo.</p>
+    <p>Para encerrar corretamente, volte à janela e pressione <code>Ctrl + C</code>.</p>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Se o navegador não abrir</p>
+    <h2>Copie o endereço mostrado na janela</h2>
+    <p>Normalmente será <code>http://127.0.0.1:8000/</code>. Se a porta 8000 já estiver ocupada, o programa procura automaticamente 8001, 8002 e assim por diante.</p>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Primeira atualização</p>
+    <h2>O que é a pasta .venv-local?</h2>
+    <p>É um ambiente Python isolado usado apenas pelo Gamma Exposure. Ele evita misturar as bibliotecas do projeto com outros programas instalados no computador. Você não precisa abrir essa pasta nem editar nada nela.</p>
+    <p>Se ela for apagada, a opção “Atualizar dados e abrir” simplesmente a cria novamente.</p>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Problemas comuns</p>
+    <h2>Soluções rápidas</h2>
+    <div class="lesson-grid lesson-grid-2">
+      <article class="lesson-card">
+        <h2>“Python não foi encontrado”</h2>
+        <p>Instale pelo WinGet e reabra o terminal. Teste <code>python --version</code> e <code>py -3 --version</code>.</p>
+      </article>
+      <article class="lesson-card">
+        <h2>Atualização falhou</h2>
+        <p>Verifique a internet. Você ainda pode usar a opção 1 e abrir com os últimos dados já salvos.</p>
+      </article>
+      <article class="lesson-card">
+        <h2>Porta 8000 ocupada</h2>
+        <p>Não precisa alterar configuração: o programa procura outra porta livre automaticamente e mostra o endereço correto.</p>
+      </article>
+      <article class="lesson-card">
+        <h2>Windows mostrou um aviso</h2>
+        <p>Confirme que o ZIP veio do repositório oficial. O servidor usa apenas <code>127.0.0.1</code>, isto é, o próprio computador.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Usuários avançados</p>
+    <h2>Comandos manuais</h2>
+    <p>Abrir sem atualizar:</p>
+    <pre><code>python local_app.py</code></pre>
+    <p>Instalar dependências e atualizar antes de abrir:</p>
+    <pre><code>python -m pip install -r collector\requirements.txt
+python local_app.py --update-data</code></pre>
+    <p>Não abrir o navegador automaticamente:</p>
+    <pre><code>python local_app.py --no-browser</code></pre>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Importante</p>
+    <h2>Rodar localmente não muda a natureza dos dados</h2>
+    <p>A chain pública do CBOE e o feed público usado nos candles continuam sujeitos a atraso e indisponibilidade. Rodar no seu computador muda onde a interface é servida; não transforma as fontes em feeds profissionais real-time.</p>
+  </section>
+
+</main>
+</body>
+</html>
