@@ -33,9 +33,9 @@
   </div>
   <div id="errorBanner" class="banner err" hidden></div>
 
-  <section class="kpis" id="kpis" aria-label="Resumo do Gamma Exposure"></section>
+  <section class="kpis" id="kpis" aria-label="Resumo do Gamma Exposure" data-help="kpis"></section>
 
-  <section class="card snapshot-card">
+  <section class="card snapshot-card" data-help="snapshots">
     <div class="card-head">
       <div>
         <p class="section-kicker">Histórico de leituras</p>
@@ -59,7 +59,7 @@
     </div>
   </section>
 
-  <section class="card quality-card">
+  <section class="card quality-card" data-help="quality">
     <div class="card-head">
       <div>
         <p class="section-kicker">Qualidade e freshness</p>
@@ -72,7 +72,7 @@
     <div class="quality-flags" id="qualityFlags"></div>
   </section>
 
-  <section class="card focal">
+  <section class="card focal" data-help="gex-strike">
     <div class="card-head">
       <div>
         <p class="section-kicker">Mapa de opções</p>
@@ -99,7 +99,7 @@
     <div class="chart chart-gex" id="chartGex"></div>
   </section>
 
-  <section class="card heatmap-card">
+  <section class="card heatmap-card" data-help="gex-heatmap">
     <div class="card-head">
       <div>
         <p class="section-kicker">Estrutura por vencimento</p>
@@ -116,7 +116,7 @@
     <div class="chart heatmap-chart" id="gexHeatmap"></div>
   </section>
 
-  <section class="card compare-card">
+  <section class="card compare-card" data-help="snapshot-compare">
     <div class="card-head">
       <div>
         <p class="section-kicker">Comparação histórica</p>
@@ -139,7 +139,7 @@
     <div class="chart compare-chart" id="compareChart"></div>
   </section>
 
-  <section class="card temporal-card">
+  <section class="card temporal-card" data-help="time-map">
     <div class="card-head">
       <div>
         <p class="section-kicker">Evolução intradiária</p>
@@ -159,7 +159,7 @@
     <div class="chart temporal-chart" id="timeStrikeHeatmap"></div>
   </section>
 
-  <section class="card structure-card">
+  <section class="card structure-card" data-help="maxpain-em">
     <div class="card-head">
       <div>
         <p class="section-kicker">Estrutura do vencimento</p>
@@ -173,7 +173,7 @@
     <p class="config-hint" id="structureNote"></p>
   </section>
 
-  <section class="card advanced-card">
+  <section class="card advanced-card" data-help="advanced-greeks">
     <div class="card-head">
       <div>
         <p class="section-kicker">Greeks de segunda ordem</p>
@@ -194,7 +194,7 @@
     <p class="config-hint">DEX = notional delta; Vanna = variação estimada do notional delta para +1 ponto de volatilidade; Charm = variação estimada do notional delta por um dia decorrido.</p>
   </section>
 
-  <section class="card iv-card">
+  <section class="card iv-card" data-help="iv-skew">
     <div class="card-head">
       <div>
         <p class="section-kicker">Volatilidade implícita</p>
@@ -219,7 +219,7 @@
     <p class="config-hint" id="ivStructureNote"></p>
   </section>
 
-  <section class="card oi-card">
+  <section class="card oi-card" data-help="oi-delta">
     <div class="card-head">
       <div>
         <p class="section-kicker">Mudança entre sessões</p>
@@ -236,7 +236,83 @@
     <p class="config-hint" id="oiNote"></p>
   </section>
 
-  <section class="card display-config">
+  <section class="card stress-card" data-help="stress-lab">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Laboratório de cenários</p>
+        <h2>Stress Lab · Market Wind Tunnel</h2>
+        <p class="note">Altere spot, IV e passagem do tempo para testar como a estrutura teórica poderia mudar. Cenários usam o snapshot atual e agregados por strike.</p>
+      </div>
+      <span class="pill" id="stressExpiryBadge">—</span>
+    </div>
+    <div class="stress-controls">
+      <label>Choque no EWZ (%)
+        <input id="stressSpotPct" type="number" min="-20" max="20" step="0.25" value="0">
+      </label>
+      <label>Choque de IV (vol pts)
+        <input id="stressIvPts" type="number" min="-30" max="30" step="0.5" value="0">
+      </label>
+      <label>Dias decorridos
+        <input id="stressDays" type="number" min="0" max="365" step="1" value="0">
+      </label>
+      <div class="stress-actions">
+        <button type="button" id="runStressBtn">Executar cenário</button>
+        <button type="button" class="ghost" id="resetStressBtn">Resetar</button>
+        <button type="button" class="ghost" id="saveReceiptBtn">Salvar recibo</button>
+      </div>
+    </div>
+    <div class="stress-summary" id="stressSummary"></div>
+    <div class="legend" id="stressLegend"></div>
+    <div class="chart stress-chart" id="stressChart"></div>
+    <p class="config-hint" id="stressNote"></p>
+  </section>
+
+  <section class="card pinning-card" data-help="pinning">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Pinning / Gamma Gravity</p>
+        <h2>Ranking de strikes estruturais</h2>
+        <p class="note">Heurística de atração potencial combinando concentração de gamma, OI, proximidade do spot e tempo até vencimento.</p>
+      </div>
+      <span class="pill" id="pinningExpiryBadge">—</span>
+    </div>
+    <div class="pinning-list" id="pinningList"></div>
+    <p class="config-hint">O score é relativo dentro do vencimento e não representa probabilidade de fechamento no strike.</p>
+  </section>
+
+  <section class="card scorecard-card" data-help="scorecard">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Validação histórica</p>
+        <h2>Scorecard de Walls · EWZ e WIN</h2>
+        <p class="note">Avalia o que aconteceu depois de snapshots históricos usando apenas níveis conhecidos naquele momento.</p>
+      </div>
+      <label class="sel">Janela
+        <select id="scorecardHorizon">
+          <option value="60">60 minutos</option>
+          <option value="120" selected>120 minutos</option>
+          <option value="240">240 minutos</option>
+        </select>
+      </label>
+    </div>
+    <div class="scorecard-grid" id="scorecardGrid"></div>
+    <div class="chart scorecard-chart" id="scorecardChart"></div>
+    <p class="config-hint" id="scorecardNote"></p>
+  </section>
+
+  <section class="card receipts-card" data-help="receipts">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Reprodutibilidade</p>
+        <h2>Recibos de análise</h2>
+        <p class="note">Guarde os parâmetros e resultados de cenários para repetir ou auditar uma análise posteriormente.</p>
+      </div>
+      <button type="button" class="ghost" id="exportReceiptsBtn">Exportar JSON</button>
+    </div>
+    <div class="receipts-list" id="receiptsList"></div>
+  </section>
+
+  <section class="card display-config" data-help="display-settings">
     <div class="card-head">
       <div>
         <p class="section-kicker">Visualização configurável</p>
@@ -285,7 +361,7 @@
   </section>
 
   <section class="price-grid">
-    <article class="card price-card">
+    <article class="card price-card" data-help="price-ewz">
       <div class="card-head">
         <div>
           <p class="section-kicker">Preço + zonas de gamma</p>
@@ -317,7 +393,7 @@
       <p class="chart-help">Arraste para mover · Ctrl/⌘ + roda: zoom X · Shift + roda: zoom Y · C·Y: centralizar verticalmente · duplo clique: reset.</p>
     </article>
 
-    <article class="card price-card">
+    <article class="card price-card" data-help="price-win">
       <div class="card-head">
         <div>
           <p class="section-kicker">Preço + zonas convertidas</p>
@@ -350,7 +426,7 @@
     </article>
   </section>
 
-  <section class="card">
+  <section class="card" data-help="levels-table">
     <div class="card-head">
       <div>
         <p class="section-kicker">Níveis operacionais</p>
@@ -375,7 +451,7 @@
     </div>
   </section>
 
-  <section class="card explainer">
+  <section class="card explainer" data-help="regions-explainer">
     <h2>Como ler as regiões</h2>
     <div class="explain-grid">
       <div><strong>Gamma positivo</strong><p>Faixa acima do Gamma Flip. Em termos de modelo, tende a favorecer movimentos mais amortecidos e comportamento de reversão à média.</p></div>
@@ -388,6 +464,7 @@
 
 </main>
 <div class="tip" id="tip" role="status" hidden></div>
+<script src="help.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
