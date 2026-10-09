@@ -187,6 +187,135 @@ function chartGex(){
   legend("legendGex",[{name:"GEX calls (+)",color:cssVar("--blue"),cls:"sq"},{name:"GEX puts (−)",color:cssVar("--orange"),cls:"sq"},{name:"GEX líquido",color:cssVar("--text")},{name:"Gamma Flip",color:cssVar("--purple"),dash:true}])
 }
 
+
+function renderExpiryControls(){
+  var sel=$("expirySelect"),status=$("heatmapStatus");
+  if(!sel)return;
+  var profiles=state.gex&&Array.isArray(state.gex.expiry_profiles)?state.gex.expiry_profiles.slice():[];
+  profiles.sort(function(a,b){return (a.dte||0)-(b.dte||0)});
+  sel.innerHTML="";
+  var all=document.createElement("option");all.value="all";all.textContent="Todos os vencimentos";sel.appendChild(all);
+  if(!profiles.length){
+    state.expiryFilter="all";sel.value="all";sel.disabled=true;
+    all.textContent="Todos (snapshot sem detalhe por vencimento)";
+    if(status)status.textContent="Disponível a partir das novas coletas";
+    return
+  }
+  sel.disabled=false;
+  profiles.forEach(function(p){
+    var o=document.createElement("option");o.value=p.expiration;
+    var d=new Date(p.expiration+"T12:00:00");
+    o.textContent=d.toLocaleDateString("pt-BR")+" · "+p.dte+" DTE · "+p.n_contracts+" contratos";
+    sel.appendChild(o)
+  });
+  if(!profiles.some(function(p){return p.expiration===state.expiryFilter}))state.expiryFilter="all";
+  sel.value=state.expiryFilter;
+  if(status)status.textContent=profiles.length+" vencimentos · "+(state.expiryFilter==="all"?"visão agregada":"filtro "+new Date(state.expiryFilter+"T12:00:00").toLocaleDateString("pt-BR"))
+}
+
+function chartHeatmap(){
+  var host=$("gexHeatmap");if(!host)return;host.innerHTML="";
+  var g=state.gex,profiles=g&&Array.isArray(g.expiry_profiles)?g.expiry_profiles.slice():[];
+  if(!profiles.length){host.innerHTML='<p class="note heatmap-empty">Este snapshot não possui decomposição por vencimento. Os novos snapshots coletados passarão a armazená-la automaticamente.</p>';return}
+  profiles.sort(function(a,b){return (a.dte||0)-(b.dte||0)});
+  var lo=g.spot*(1-state.range),hi=g.spot*(1+state.range),strikeSet={};
+  profiles.forEach(function(p){(p.strikes||[]).forEach(function(s){if(s.k>=lo&&s.k<=hi)strikeSet[s.k]=true})});
+  var strikes=Object.keys(strikeSet).map(Number).sort(function(a,b){return b-a});
+  if(!strikes.length){host.innerHTML='<p class="note">Sem strikes na faixa selecionada.</p>';return}
+  var cellW=64,cellH=22,m={l:68,r:16,t:92,b:24},W=Math.max(900,m.l+m.r+profiles.length*cellW),H=m.t+m.b+strikes.length*cellH;
+  var svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,width:W,height:H,role:"img","aria-label":"Heatmap GEX por strike e vencimento"},host);
+  var valueMap={},maxAbs=1;
+  profiles.forEach(function(p,pi){
+    var by={};(p.strikes||[]).forEach(function(s){by[s.k]=s;maxAbs=Math.max(maxAbs,Math.abs(s.net||0))});
+    valueMap[pi]=by
+  });
+  profiles.forEach(function(p,pi){
+    var cx=m.l+pi*cellW+cellW/2,label=new Date(p.expiration+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+    var t=svgText(svg,cx,m.t-12,label,{"text-anchor":"end",class:"heat-label"});t.setAttribute("transform","rotate(-55 "+cx+" "+(m.t-12)+")");
+    svgText(svg,cx,m.t-2,p.dte+"d",{"text-anchor":"middle",style:"fill:"+cssVar("--muted")});
+    if(state.expiryFilter===p.expiration)svgEl("rect",{x:m.l+pi*cellW+1,y:m.t-1,width:cellW-2,height:strikes.length*cellH+2,fill:"none",stroke:cssVar("--purple"),"stroke-width":2,rx:3},svg)
+  });
+  strikes.forEach(function(k,ri){
+    var yy=m.t+ri*cellH;
+    svgText(svg,m.l-8,yy+cellH*.68,fmt2.format(k),{"text-anchor":"end",class:"lbl"});
+    profiles.forEach(function(p,pi){
+      var s=valueMap[pi][k]||{net:0,call:0,put:0},abs=Math.abs(s.net||0),strength=abs/maxAbs;
+      var color=s.net>0?cssVar("--blue"):s.net<0?cssVar("--orange"):cssVar("--grid");
+      var opacity=s.net===0?.08:(.14+.76*strength);
+      var rect=svgEl("rect",{x:m.l+pi*cellW+2,y:yy+2,width:cellW-4,height:cellH-4,rx:3,fill:color,"fill-opacity":opacity.toFixed(3),stroke:cssVar("--border"),"stroke-width":.5},svg);
+      rect.addEventListener("pointermove",function(e){showTip(e,new Date(p.expiration+"T12:00:00").toLocaleDateString("pt-BR")+" · Strike "+fmt2.format(k),[["DTE",String(p.dte)],["GEX líquido",usd(s.net||0)],["Calls",usd(s.call||0)],["Puts",usd(s.put||0)]])});
+      rect.addEventListener("pointerleave",hideTip)
+    })
+  });
+  svgText(svg,8,m.t-10,"Strike", {class:"lbl"});
+}
+
+function compareOptionLabel(e){
+  return new Date(e.local_date+"T12:00:00").toLocaleDateString("pt-BR")+" · "+e.local_time.slice(0,5)+(e.is_win_open_reference?" · ★ abertura":"")
+}
+function renderCompareControls(){
+  var aSel=$("compareASelect"),bSel=$("compareBSelect");if(!aSel||!bSel)return;
+  var entries=snapshotEntries();if(!entries.length){aSel.innerHTML="<option>Sem histórico</option>";bSel.innerHTML="<option>Sem histórico</option>";aSel.disabled=true;bSel.disabled=true;$("compareBtn").disabled=true;return}
+  aSel.disabled=false;bSel.disabled=false;$("compareBtn").disabled=false;
+  var keepA=aSel.value,keepB=bSel.value;
+  aSel.innerHTML="";bSel.innerHTML="";
+  entries.forEach(function(e){
+    [aSel,bSel].forEach(function(sel){var o=document.createElement("option");o.value=e.generated_at;o.textContent=compareOptionLabel(e);sel.appendChild(o)})
+  });
+  var opening=entries.find(function(e){return e.is_win_open_reference})||entries[entries.length-1],latest=entries[0];
+  aSel.value=entries.some(function(e){return e.generated_at===keepA})?keepA:opening.generated_at;
+  bSel.value=entries.some(function(e){return e.generated_at===keepB})?keepB:latest.generated_at
+}
+function loadCompare(){
+  var aKey=$("compareASelect").value,bKey=$("compareBSelect").value,entries=snapshotEntries();
+  var ae=entries.find(function(e){return e.generated_at===aKey}),be=entries.find(function(e){return e.generated_at===bKey});
+  if(!ae||!be)return;
+  $("compareBtn").disabled=true;$("compareBtn").textContent="Carregando…";
+  Promise.all([getJson(ae.file),getJson(be.file)]).then(function(r){
+    state.compareA={entry:ae,data:r[0]};state.compareB={entry:be,data:r[1]};renderComparison()
+  }).catch(function(err){var b=$("errorBanner");b.hidden=false;b.textContent="Falha ao comparar snapshots: "+err.message})
+    .finally(function(){$("compareBtn").disabled=false;$("compareBtn").textContent="Comparar"})
+}
+function renderComparison(){
+  var box=$("compareSummary"),host=$("compareChart");if(!box||!host)return;
+  if(!state.compareA||!state.compareB){box.innerHTML='<p class="note">Escolha dois snapshots e clique em Comparar.</p>';host.innerHTML="";return}
+  var A=state.compareA.data,B=state.compareB.data,ae=state.compareA.entry,be=state.compareB.entry;
+  box.innerHTML="";
+  var metrics=[
+    ["Spot",A.spot,B.spot,function(v){return "US$ "+fmt2.format(v)}],
+    ["GEX líquido",A.net_gex,B.net_gex,usd],
+    ["Call Wall",A.call_wall,B.call_wall,function(v){return v==null?"—":fmt2.format(v)}],
+    ["Put Wall",A.put_wall,B.put_wall,function(v){return v==null?"—":fmt2.format(v)}],
+    ["Gamma Flip",A.flip,B.flip,function(v){return v==null?"—":fmt2.format(v)}]
+  ];
+  metrics.forEach(function(m){
+    var card=document.createElement("div");card.className="compare-metric";
+    var title=document.createElement("span");title.textContent=m[0];
+    var vals=document.createElement("strong");vals.textContent=m[3](m[1])+" → "+m[3](m[2]);
+    var delta=document.createElement("small");
+    if(m[1]!=null&&m[2]!=null){var dv=m[2]-m[1];delta.textContent="Δ "+(m[0]==="GEX líquido"?usd(dv):fmt2.format(dv))}
+    else delta.textContent="Δ —";
+    card.appendChild(title);card.appendChild(vals);card.appendChild(delta);box.appendChild(card)
+  });
+  legend("compareLegend",[{name:"A · "+ae.local_time.slice(0,5),color:cssVar("--purple")},{name:"B · "+be.local_time.slice(0,5),color:cssVar("--blue")},{name:"Δ B−A",color:cssVar("--cyan"),cls:"sq"}]);
+  host.innerHTML="";
+  var mapA={},mapB={};(A.strikes||[]).forEach(function(s){mapA[s.k]=s.net||0});(B.strikes||[]).forEach(function(s){mapB[s.k]=s.net||0});
+  var center=B.spot||A.spot,lo=center*(1-state.range),hi=center*(1+state.range);
+  var ks=Object.keys(Object.assign({},mapA,mapB)).map(Number).filter(function(k){return k>=lo&&k<=hi}).sort(function(a,b){return a-b});
+  if(ks.length<2){host.innerHTML='<p class="note">Sem strikes suficientes para comparar nessa faixa.</p>';return}
+  var W=1220,H=360,m={l:78,r:20,t:22,b:48},vals=[];ks.forEach(function(k){vals.push(mapA[k]||0,mapB[k]||0,(mapB[k]||0)-(mapA[k]||0))});
+  var vmax=Math.max.apply(null,vals.map(Math.abs))*1.12||1,x=function(i){return m.l+i/(ks.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v+vmax)/(2*vmax))*(H-m.t-m.b)};
+  var svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Comparação de perfis GEX"},host);
+  niceTicks(-vmax,vmax,6).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:t===0?"axis":"grid"},svg);svgText(svg,m.l-9,y(t)+4,compact(t),{"text-anchor":"end"})});
+  var step=(W-m.l-m.r)/(ks.length-1),bw=Math.max(3,Math.min(18,step*.45));
+  ks.forEach(function(k,i){var diff=(mapB[k]||0)-(mapA[k]||0),yy=y(diff);svgEl("rect",{x:x(i)-bw/2,y:Math.min(y(0),yy),width:bw,height:Math.max(1,Math.abs(yy-y(0))),fill:cssVar("--cyan"),"fill-opacity":.18},svg)});
+  function pathFor(map){return ks.map(function(k,i){return(i?"L":"M")+x(i).toFixed(1)+" "+y(map[k]||0).toFixed(1)}).join(" ")}
+  svgEl("path",{d:pathFor(mapA),fill:"none",stroke:cssVar("--purple"),"stroke-width":2},svg);
+  svgEl("path",{d:pathFor(mapB),fill:"none",stroke:cssVar("--blue"),"stroke-width":2},svg);
+  var every=Math.max(1,Math.ceil(ks.length/10));ks.forEach(function(k,i){if(i%every===0||i===ks.length-1)svgText(svg,x(i),H-m.b+17,fmt2.format(k),{"text-anchor":"middle"})});
+  ks.forEach(function(k,i){var hit=svgEl("rect",{x:x(i)-step/2,y:m.t,width:Math.max(8,step),height:H-m.t-m.b,class:"hit"},svg);hit.addEventListener("pointermove",function(e){showTip(e,"Strike "+fmt2.format(k),[["A",usd(mapA[k]||0)],["B",usd(mapB[k]||0)],["Δ B−A",usd((mapB[k]||0)-(mapA[k]||0))]])});hit.addEventListener("pointerleave",hideTip)})
+}
+
 function gammaZones(mapper){
   var d=activeGex(),rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
   for(var i=1;i<rows.length;i++)gap=Math.min(gap,rows[i].k-rows[i-1].k);if(!isFinite(gap))gap=.5;
