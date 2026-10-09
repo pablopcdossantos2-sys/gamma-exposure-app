@@ -139,6 +139,46 @@ button.ghost{background:transparent;color:var(--muted);border-color:var(--border
 .iv-chart{background:var(--surface)}
 .oi-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
 .oi-chart{margin-top:4px}
+
+/* Contextual education / info icons */
+[data-help]{position:relative}
+.info-icon{display:inline-flex;align-items:center;justify-content:center;width:23px;height:23px;min-width:23px;padding:0;margin-left:7px;border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--blue);font:800 italic .76rem/1 Georgia,serif;vertical-align:middle;box-shadow:none}
+.info-icon:hover{background:color-mix(in srgb,var(--blue) 10%,var(--surface));border-color:color-mix(in srgb,var(--blue) 45%,var(--border));transform:none}
+.info-icon-float{position:absolute;right:8px;top:8px;margin:0;z-index:3}
+.heading-with-info{display:inline}
+.info-modal-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(4,9,18,.62);display:flex;align-items:center;justify-content:center;padding:18px}
+.info-modal-backdrop[hidden]{display:none}
+.info-modal{position:relative;width:min(680px,100%);max-height:min(82vh,760px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.35)}
+.info-modal h2{margin:2px 38px 14px 0;font-size:1.35rem}.info-modal h3{font-size:.88rem;margin:0 0 5px}.info-modal p{margin:0;color:var(--muted)}
+.info-modal-close{position:absolute;right:12px;top:12px;width:34px;height:34px;min-width:34px;padding:0;border-radius:50%;background:var(--surface-2);color:var(--text);border:1px solid var(--border);font-size:1.35rem;line-height:1}
+.info-modal-block{padding:12px 0;border-top:1px solid var(--border)}.info-modal-block.caution{border-left:3px solid var(--orange);padding-left:12px}
+.info-more{display:inline-flex;margin-top:12px;color:var(--blue);font-weight:700;text-decoration:none}.modal-open{overflow:hidden}
+
+/* Stress Lab */
+.stress-controls{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr)) auto;gap:9px;align-items:end;margin:10px 0}
+.stress-controls label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:.78rem}
+.stress-actions{display:flex;gap:6px;flex-wrap:wrap}
+.stress-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.stress-metric,.scorecard-metric{padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);min-width:0}
+.stress-metric span,.stress-metric strong,.stress-metric small,.scorecard-metric span,.scorecard-metric strong,.scorecard-metric small{display:block}
+.stress-metric span,.scorecard-metric span{font-size:.71rem;color:var(--muted)}
+.stress-metric strong,.scorecard-metric strong{font-size:.84rem;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stress-metric small,.scorecard-metric small{font-size:.7rem;color:var(--muted);margin-top:2px}
+.stress-chart{margin-top:4px}
+
+/* Pinning */
+.pinning-list{display:grid;gap:6px;margin-top:10px}.pinning-row{display:grid;grid-template-columns:42px 1fr 62px;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}
+.pin-rank{font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}.pin-main strong,.pin-main small{display:block}.pin-main small{color:var(--muted);font-size:.72rem;margin-top:2px}
+.pin-bar{height:5px;background:var(--border);border-radius:999px;margin-top:6px;overflow:hidden}.pin-bar i{display:block;height:100%;background:var(--purple);border-radius:999px}
+.pin-score{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+
+/* Historical scorecard */
+.scorecard-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}.scorecard-chart{margin-top:4px}
+
+/* Receipts */
+.receipts-list{display:grid;gap:7px;margin-top:8px}.receipt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}
+.receipt-meta strong,.receipt-meta small{display:block}.receipt-meta small{color:var(--muted);font-size:.74rem;margin-top:2px}.receipt-actions{display:flex;gap:5px;flex-wrap:wrap}
+.receipt-actions button{min-height:30px;padding:5px 8px;font-size:.72rem}
 .display-config{padding-bottom:14px}
 .display-controls{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;margin-top:10px}
 .display-controls label{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:.78rem}
@@ -178,8 +218,8 @@ th{font-size:.75rem;color:var(--muted);font-weight:700}.num{text-align:right}td:
 .tip{position:fixed;z-index:20;pointer-events:none;max-width:280px;background:var(--surface);color:var(--text);border:1px solid var(--border);
   border-radius:9px;padding:8px 10px;font-size:.8rem;box-shadow:0 8px 25px rgba(0,0,0,.2);font-variant-numeric:tabular-nums}
 .tip b{display:block;margin-bottom:3px}.tip .r{display:flex;justify-content:space-between;gap:18px;color:var(--muted)}.tip .r span:last-child{color:var(--text)}
-@media(max-width:1000px){.quality-grid{grid-template-columns:repeat(2,1fr)}.iv-kpis{grid-template-columns:repeat(3,1fr)}.dual-chart-grid{grid-template-columns:1fr}.structure-kpis,.advanced-kpis{grid-template-columns:repeat(2,1fr)}.compare-summary{grid-template-columns:repeat(3,1fr)}.lesson-grid-3{grid-template-columns:1fr 1fr}.kpis{grid-template-columns:repeat(3,1fr)}.snapshot-controls{grid-template-columns:1fr 1fr}.snapshot-summary{grid-column:1/-1}.display-controls{grid-template-columns:1fr 1fr 1fr}.explain-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:720px){.quality-grid,.iv-kpis,.oi-summary{grid-template-columns:1fr 1fr}.structure-kpis,.advanced-kpis{grid-template-columns:1fr 1fr}.compare-controls{grid-template-columns:1fr}.compare-summary{grid-template-columns:1fr 1fr}.gex-card-controls{width:100%;align-items:stretch}.gex-card-controls .sel{justify-content:space-between}.lesson-grid-3,.lesson-grid-2,.regime-compare,.myth-grid,.glossary{grid-template-columns:1fr}.glossary>div{grid-template-columns:105px 1fr}.site-nav{width:100%}.site-nav a{flex:1;justify-content:center}.guide-hero h1{font-size:1.65rem}.wrap{padding:18px 10px 46px}.hero{align-items:flex-start;flex-direction:column}.source-box{text-align:left;min-width:0}
+@media(max-width:1000px){.stress-controls{grid-template-columns:repeat(2,1fr)}.stress-actions{grid-column:1/-1}.stress-summary{grid-template-columns:repeat(2,1fr)}.scorecard-grid{grid-template-columns:repeat(3,1fr)}.quality-grid{grid-template-columns:repeat(2,1fr)}.iv-kpis{grid-template-columns:repeat(3,1fr)}.dual-chart-grid{grid-template-columns:1fr}.structure-kpis,.advanced-kpis{grid-template-columns:repeat(2,1fr)}.compare-summary{grid-template-columns:repeat(3,1fr)}.lesson-grid-3{grid-template-columns:1fr 1fr}.kpis{grid-template-columns:repeat(3,1fr)}.snapshot-controls{grid-template-columns:1fr 1fr}.snapshot-summary{grid-column:1/-1}.display-controls{grid-template-columns:1fr 1fr 1fr}.explain-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.stress-controls{grid-template-columns:1fr}.stress-actions{grid-column:auto}.stress-summary,.scorecard-grid{grid-template-columns:1fr 1fr}.receipt-row{align-items:flex-start;flex-direction:column}.quality-grid,.iv-kpis,.oi-summary{grid-template-columns:1fr 1fr}.structure-kpis,.advanced-kpis{grid-template-columns:1fr 1fr}.compare-controls{grid-template-columns:1fr}.compare-summary{grid-template-columns:1fr 1fr}.gex-card-controls{width:100%;align-items:stretch}.gex-card-controls .sel{justify-content:space-between}.lesson-grid-3,.lesson-grid-2,.regime-compare,.myth-grid,.glossary{grid-template-columns:1fr}.glossary>div{grid-template-columns:105px 1fr}.site-nav{width:100%}.site-nav a{flex:1;justify-content:center}.guide-hero h1{font-size:1.65rem}.wrap{padding:18px 10px 46px}.hero{align-items:flex-start;flex-direction:column}.source-box{text-align:left;min-width:0}
   .kpis{grid-template-columns:repeat(2,1fr)}.card-head{flex-direction:column}.snapshot-controls{grid-template-columns:1fr}.snapshot-summary{grid-column:auto}.display-controls{grid-template-columns:1fr}.override{min-width:0;width:100%}.explain-grid{grid-template-columns:1fr}
   .chart-tools-overlay{top:7px;right:8px;max-width:250px}.chart-tool{min-width:34px;min-height:32px}.chart-view-status-overlay{left:76px;top:8px}.chart-help{font-size:.7rem}.chart svg{min-width:700px}}
 @media(max-width:480px){h1{font-size:1.55rem}.kpis{grid-template-columns:1fr 1fr}.kpi .big{font-size:1.12rem}.override>div{flex-wrap:wrap}}
