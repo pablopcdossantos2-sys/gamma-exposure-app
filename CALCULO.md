@@ -549,3 +549,107 @@ Snapshots v6 passam a preservar:
 - volume por strike/lado considerando a chain válida completa.
 
 A separação entre contratos usados em GEX e contratos usados em atividade/volume evita que opções com OI zero distorçam o GEX ao mesmo tempo em que preserva sua negociação atual.
+
+
+## 25. Indicadores de preço opcionais — C5
+
+Os indicadores são calculados exclusivamente a partir dos candles de 5 minutos do ativo selecionado (EWZ ou WIN1!).
+
+### ATR(14)
+
+Usamos True Range:
+
+    TR = max(
+      máxima - mínima,
+      |máxima - fechamento_anterior|,
+      |mínima - fechamento_anterior|
+    )
+
+O ATR usa suavização de Wilder em 14 períodos.
+
+Também exibimos:
+
+    ATR_pct = ATR / preço × 100
+
+### RSI(14)
+
+Usamos o RSI de Wilder com ganhos e perdas médios suavizados em 14 períodos:
+
+    RS = ganho_médio / perda_média
+    RSI = 100 - 100 / (1 + RS)
+
+### Bandas de Bollinger(20, 2σ)
+
+    média = SMA20
+    banda_superior = média + 2 × desvio_padrão20
+    banda_inferior = média - 2 × desvio_padrão20
+
+A largura exibida é:
+
+    BB_width_pct = (superior - inferior) / média × 100
+
+### Separação metodológica
+
+ATR, RSI e Bollinger:
+
+- não alteram GEX;
+- não alteram Walls ou Gamma Flip;
+- não entram no Stress Lab;
+- não alteram scorecards;
+- são apenas uma camada opcional de confluência de preço.
+
+## 26. OI-weighted × Volume-weighted Gamma — D1
+
+O modelo **OI-weighted** é o GEX estrutural já usado pelo projeto:
+
+    GEX_OI = gamma × OI × 100 × spot² × 0,01
+
+O modelo **Volume-weighted** usa a mesma escala de gamma-dollar, porém substitui OI pelo volume acumulado da sessão:
+
+    Gamma_Activity = gamma × volume × 100 × spot² × 0,01
+
+Mantemos a mesma convenção visual:
+
+- calls positivas;
+- puts negativas.
+
+### O que cada modelo representa
+
+**OI-weighted**
+- estoque de posições abertas;
+- estrutura/inventário;
+- base das Walls e do GEX principal.
+
+**Volume-weighted**
+- atividade da sessão;
+- concentração de negociação ponderada por gamma;
+- não representa estoque;
+- não identifica agressor;
+- não representa posição dealer observada.
+
+O painel mostra:
+
+- total bruto OI-weighted;
+- total bruto Volume-weighted;
+- strike de maior magnitude em cada modelo;
+- correlação dos perfis por strike;
+- dois perfis normalizados em ±100%.
+
+A normalização é feita separadamente:
+
+    perfil_normalizado = valor / max(|perfil|) × 100
+
+Isso permite comparar a **forma** sem sugerir equivalência de magnitude entre inventário e atividade.
+
+## 27. Snapshot v7
+
+Snapshots v7 passam a preservar:
+
+- `volume_gamma_total`;
+- `volume_call_wall`;
+- `volume_put_wall`;
+- `volume_max_abs_strike`;
+- `volume_gamma_strikes`;
+- `volume_gamma_call`, `volume_gamma_put` e `volume_gamma_net` por strike.
+
+C5 não exige novos campos de snapshot, porque os indicadores são calculados diretamente dos candles.
