@@ -15,11 +15,13 @@ function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localSto
 function lastBars(key){var p=state.prices&&state.prices[key];return p&&p.bars&&p.bars.length?p.bars:[]}
 function lastClose(key){var b=lastBars(key);return b.length?b[b.length-1].c:null}
 function conversionRatio(){
-  var ewz=lastClose("ewz");
+  var eb=lastBars("ewz"),wb=lastBars("win"),ewz=eb.length?eb[eb.length-1].c:null;
   if(!ewz)return null;
   if(state.manualWin&&state.manualWin>0)return state.manualWin/ewz;
-  var win=lastClose("win");
-  return win?win/ewz:null
+  if(!wb.length)return null;
+  var winByTime={};wb.slice(-220).forEach(function(b){winByTime[b.t]=b.c});
+  for(var i=eb.length-1;i>=Math.max(0,eb.length-220);i--){if(winByTime[eb[i].t])return winByTime[eb[i].t]/eb[i].c}
+  return wb[wb.length-1].c/ewz
 }
 function toWin(v){var r=conversionRatio();return v==null||!r?null:Math.round(v*r/WIN_TICK)*WIN_TICK}
 function niceTicks(min,max,n){var span=max-min||1,step=Math.pow(10,Math.floor(Math.log10(span/n))),err=span/n/step;step*=err>=7.5?10:err>=3.5?5:err>=1.5?2:1;var out=[],v=Math.ceil(min/step)*step;for(;v<=max+step*1e-6;v+=step)out.push(Math.abs(v)<step*1e-9?0:v);return out}
@@ -45,7 +47,7 @@ function renderHeader(){
   $("status").textContent="GEX "+gtime.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})+(p&&p.generated_at?" · preços "+new Date(p.generated_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"");
   $("demoBanner").hidden=!d.demo;
   $("ratioValue").textContent=r?fmt2.format(r)+" pts/US$":"indisponível";
-  $("ratioHint").textContent=state.manualWin?"ajuste manual ativo":"último WIN1! ÷ último EWZ";
+  $("ratioHint").textContent=state.manualWin?"ajuste manual ativo":"candles coincidentes de WIN1! e EWZ";
   var ewzp=p&&p.ewz,winp=p&&p.win;
   $("ewzMeta").textContent="AMEX:EWZ"+(ewzp&&ewzp.last_bar_at?" · último candle "+new Date(ewzp.last_bar_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"")+(ewzp&&ewzp.stale?" · dados anteriores":"");
   $("winMeta").textContent="BMFBOVESPA:WIN1!"+(winp&&winp.last_bar_at?" · último candle "+new Date(winp.last_bar_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"")+(winp&&winp.stale?" · dados anteriores":"")
@@ -56,7 +58,7 @@ function renderKpis(){
     ["EWZ / regime","US$ "+fmt2.format(d.spot),regime(d),cssVar("--text")],
     ["GEX líquido",usd(d.net_gex),d.n_contracts+" contratos",cssVar("--cyan")],
     ["Call Wall","US$ "+fmt2.format(d.call_wall),"WIN "+(toWin(d.call_wall)==null?"—":fmt0.format(toWin(d.call_wall))),cssVar("--blue")],
-    ["Gamma Flip",d.flip==null?"—":"US$ "+fmt2.format(d.flip),d.flip==null?"sem cruzamento":"WIN "+fmt0.format(toWin(d.flip)||0),cssVar("--purple")],
+    ["Gamma Flip",d.flip==null?"—":"US$ "+fmt2.format(d.flip),d.flip==null?"sem cruzamento":toWin(d.flip)==null?"WIN —":"WIN "+fmt0.format(toWin(d.flip)),cssVar("--purple")],
     ["Put Wall","US$ "+fmt2.format(d.put_wall),"WIN "+(toWin(d.put_wall)==null?"—":fmt0.format(toWin(d.put_wall))),cssVar("--orange")]
   ].forEach(function(it){var k=document.createElement("div");k.className="kpi";var l=document.createElement("div");l.className="lab";var dot=document.createElement("i");dot.className="dot";dot.style.background=it[3];l.appendChild(dot);l.appendChild(document.createTextNode(it[0]));var big=document.createElement("div");big.className="big";big.textContent=it[1];var sm=document.createElement("div");sm.className="small";sm.textContent=it[2];k.appendChild(l);k.appendChild(big);k.appendChild(sm);b.appendChild(k)})
 }
