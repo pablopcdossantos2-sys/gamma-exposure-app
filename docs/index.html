@@ -393,6 +393,46 @@
     <p class="config-hint" id="autoContextNote"></p>
   </section>
 
+  <section class="card confluence-card" data-help="price-confluence">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Confluência opcional</p>
+        <h2>ATR · RSI · Bandas de Bollinger</h2>
+        <p class="note">Indicadores derivados apenas dos candles. Eles não entram no cálculo de GEX e podem ser ativados ou ocultados livremente.</p>
+      </div>
+      <label class="sel">Ativo
+        <select id="confluenceAsset">
+          <option value="ewz">EWZ</option>
+          <option value="win">WIN1!</option>
+        </select>
+      </label>
+    </div>
+    <div class="confluence-controls">
+      <label class="check-label"><input type="checkbox" id="showAtr" checked> ATR(14)</label>
+      <label class="check-label"><input type="checkbox" id="showRsi" checked> RSI(14)</label>
+      <label class="check-label"><input type="checkbox" id="showBb" checked> Bollinger(20, 2σ)</label>
+    </div>
+    <div class="confluence-kpis" id="confluenceKpis"></div>
+    <div class="legend" id="confluenceLegend"></div>
+    <div class="chart confluence-chart" id="confluenceChart"></div>
+    <p class="config-hint" id="confluenceNote"></p>
+  </section>
+
+  <section class="card weighting-card" data-help="weighting-models">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Inventário × atividade</p>
+        <h2>OI-weighted × Volume-weighted Gamma</h2>
+        <p class="note">Compara o GEX estrutural baseado em posições abertas com um proxy separado de atividade gamma ponderado pelo volume da sessão.</p>
+      </div>
+      <span class="pill" id="weightingScopeBadge">—</span>
+    </div>
+    <div class="weighting-kpis" id="weightingKpis"></div>
+    <div class="legend" id="weightingLegend"></div>
+    <div class="chart weighting-chart" id="weightingChart"></div>
+    <p class="config-hint" id="weightingNote"></p>
+  </section>
+
   <section class="card display-config" data-help="display-settings">
     <div class="card-head">
       <div>

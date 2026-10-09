@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Normalized WINFUT Event",
+  "type": "object",
+  "required": ["provenance", "symbol", "event_type"],
+  "properties": {
+    "provenance": {"type": "object"},
+    "symbol": {"type": "string"},
+    "event_type": {"enum": ["quote", "trade", "book"]},
+    "price": {"type": ["number", "null"]},
+    "size": {"type": ["number", "null"]},
+    "bid": {"type": ["number", "null"]},
+    "ask": {"type": ["number", "null"]},
+    "bid_size": {"type": ["number", "null"]},
+    "ask_size": {"type": ["number", "null"]},
+    "aggressor_side": {"enum": ["buy", "sell", null]},
+    "bids": {"type": "array"},
+    "asks": {"type": "array"}
+  },
+  "additionalProperties": true
+}

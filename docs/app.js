@@ -971,6 +971,71 @@ function renderAutoContext(){
   loadAnalysisDay(day).then(renderAutoContextWithDay).catch(function(){renderAutoContextWithDay([])})
 }
 
+
+/* ---------- C5 · Optional price confluence ---------- */
+function sma(values,n){var out=new Array(values.length).fill(null),sum=0;for(var i=0;i<values.length;i++){sum+=values[i];if(i>=n)sum-=values[i-n];if(i>=n-1)out[i]=sum/n}return out}
+function rollingStd(values,n,means){var out=new Array(values.length).fill(null);for(var i=n-1;i<values.length;i++){var m=means[i],s=0;for(var j=i-n+1;j<=i;j++)s+=(values[j]-m)*(values[j]-m);out[i]=Math.sqrt(s/n)}return out}
+function atrSeries(bars,n){
+  var tr=bars.map(function(b,i){if(i===0)return b.h-b.l;var pc=bars[i-1].c;return Math.max(b.h-b.l,Math.abs(b.h-pc),Math.abs(b.l-pc))}),out=new Array(bars.length).fill(null);
+  if(bars.length<n)return out;var a=tr.slice(0,n).reduce(function(x,y){return x+y},0)/n;out[n-1]=a;for(var i=n;i<tr.length;i++){a=(a*(n-1)+tr[i])/n;out[i]=a}return out
+}
+function rsiSeries(bars,n){
+  var out=new Array(bars.length).fill(null);if(bars.length<=n)return out;var g=0,l=0;
+  for(var i=1;i<=n;i++){var d=bars[i].c-bars[i-1].c;if(d>=0)g+=d;else l-=d}g/=n;l/=n;out[n]=l===0?100:100-100/(1+g/l);
+  for(var k=n+1;k<bars.length;k++){var d2=bars[k].c-bars[k-1].c,gg=Math.max(d2,0),ll=Math.max(-d2,0);g=(g*(n-1)+gg)/n;l=(l*(n-1)+ll)/n;out[k]=l===0?100:100-100/(1+g/l)}return out
+}
+function confluencePrefs(){
+  return{asset:$("confluenceAsset").value,atr:$("showAtr").checked,rsi:$("showRsi").checked,bb:$("showBb").checked}
+}
+function renderConfluence(){
+  var p=confluencePrefs(),bars=lastBars(p.asset),box=$("confluenceKpis"),host=$("confluenceChart"),note=$("confluenceNote");if(!box||!host)return;box.innerHTML="";host.innerHTML="";
+  if(bars.length<25){host.innerHTML='<p class="note heatmap-empty">Candles insuficientes para calcular os indicadores.</p>';return}
+  var use=bars.slice(-160),close=use.map(function(b){return b.c}),ma=sma(close,20),sd=rollingStd(close,20,ma),atr=atrSeries(use,14),rsi=rsiSeries(use,14),last=use.length-1;
+  var upper=ma.map(function(v,i){return v==null||sd[i]==null?null:v+2*sd[i]}),lower=ma.map(function(v,i){return v==null||sd[i]==null?null:v-2*sd[i]});
+  var bw=ma[last]!=null&&ma[last]!==0?(upper[last]-lower[last])/ma[last]*100:null,atrPct=atr[last]!=null?atr[last]/close[last]*100:null;
+  [["Último preço",p.asset==="win"?fmt0.format(close[last]):"US$ "+fmt2.format(close[last]),p.asset.toUpperCase()],["ATR(14)",atr[last]==null?"—":(p.asset==="win"?fmt0.format(atr[last]):fmt2.format(atr[last])),atrPct==null?"—":fmt2.format(atrPct)+"% do preço"],["RSI(14)",rsi[last]==null?"—":fmt2.format(rsi[last]),rsi[last]==null?"—":rsi[last]>=70?"zona alta":rsi[last]<=30?"zona baixa":"faixa intermediária"],["Bollinger width",bw==null?"—":fmt2.format(bw)+"%",ma[last]==null?"—":"SMA20 ± 2σ"]].forEach(function(k){var d=document.createElement("div");d.className="confluence-kpi";d.innerHTML="<span></span><strong></strong><small></small>";d.children[0].textContent=k[0];d.children[1].textContent=k[1];d.children[2].textContent=k[2];box.appendChild(d)});
+
+  var W=1220,H=440,m={l:70,r:18,t:20,b:42},priceTop=m.t,priceBottom=235,oscTop=265,oscBottom=H-m.b,x=function(i){return m.l+i/Math.max(1,use.length-1)*(W-m.l-m.r)};
+  var priceVals=[];use.forEach(function(b,i){priceVals.push(b.h,b.l);if(p.bb&&upper[i]!=null){priceVals.push(upper[i],lower[i])}});var ymin=Math.min.apply(null,priceVals),ymax=Math.max.apply(null,priceVals),pad=(ymax-ymin)*.05||1;ymin-=pad;ymax+=pad;
+  var py=function(v){return priceTop+(1-(v-ymin)/(ymax-ymin))*(priceBottom-priceTop)},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Indicadores de confluência de preço"},host);
+  niceTicks(ymin,ymax,5).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:py(t),y2:py(t),class:"grid"},svg);svgText(svg,m.l-7,py(t)+4,p.asset==="win"?fmt0.format(t):fmt2.format(t),{"text-anchor":"end"})});
+  svgEl("path",{d:close.map(function(v,i){return(i?"L":"M")+x(i).toFixed(1)+" "+py(v).toFixed(1)}).join(" "),fill:"none",stroke:cssVar("--text"),"stroke-width":1.5},svg);
+  function nullablePath(vals,color,dash){var d="",open=false;vals.forEach(function(v,i){if(v==null){open=false;return}d+=(open?"L":"M")+x(i).toFixed(1)+" "+py(v).toFixed(1)+" ";open=true});if(d)svgEl("path",{d:d,fill:"none",stroke:color,"stroke-width":1.5,"stroke-dasharray":dash||""},svg)}
+  if(p.bb){nullablePath(upper,cssVar("--purple"));nullablePath(ma,cssVar("--cyan"),"4 3");nullablePath(lower,cssVar("--purple"))}
+  if(p.rsi){
+    var rY=function(v){return oscTop+(1-v/100)*(oscBottom-oscTop)};
+    [30,50,70].forEach(function(v){svgEl("line",{x1:m.l,x2:W-m.r,y1:rY(v),y2:rY(v),stroke:v===50?cssVar("--grid"):cssVar("--axis"),"stroke-dasharray":"4 4"},svg);svgText(svg,m.l-7,rY(v)+4,String(v),{"text-anchor":"end"})});
+    var rd="",open=false;rsi.forEach(function(v,i){if(v==null){open=false;return}rd+=(open?"L":"M")+x(i).toFixed(1)+" "+rY(v).toFixed(1)+" ";open=true});if(rd)svgEl("path",{d:rd,fill:"none",stroke:cssVar("--orange"),"stroke-width":1.8},svg)
+  }else if(p.atr){
+    var av=atr.filter(function(v){return v!=null}),amax=Math.max.apply(null,av)||1,aY=function(v){return oscTop+(1-v/amax)*(oscBottom-oscTop)},ad="",open=false;atr.forEach(function(v,i){if(v==null){open=false;return}ad+=(open?"L":"M")+x(i).toFixed(1)+" "+aY(v).toFixed(1)+" ";open=true});if(ad)svgEl("path",{d:ad,fill:"none",stroke:cssVar("--green"),"stroke-width":1.8},svg)
+  }
+  var every=Math.max(1,Math.ceil(use.length/8));use.forEach(function(b,i){if(i%every===0||i===use.length-1)svgText(svg,x(i),H-m.b+17,timeLabel(b.t,false),{"text-anchor":"middle"})});
+  var li=[{name:"Preço",color:cssVar("--text")}];if(p.bb)li.push({name:"Bollinger",color:cssVar("--purple")});if(p.rsi)li.push({name:"RSI(14)",color:cssVar("--orange")});if(p.atr)li.push({name:"ATR(14) no KPI"+(p.rsi?"":" / painel inferior"),color:cssVar("--green")});legend("confluenceLegend",li);
+  note.textContent="Indicadores calculados apenas sobre candles de 5 minutos do "+p.asset.toUpperCase()+". São confluências opcionais e não alteram GEX, Walls, Flip ou qualquer modelo de opções."
+}
+
+/* ---------- D1 · OI-weighted vs volume-weighted gamma ---------- */
+function pearson(xs,ys){var n=Math.min(xs.length,ys.length);if(n<2)return null;var mx=xs.reduce(function(a,b){return a+b},0)/n,my=ys.reduce(function(a,b){return a+b},0)/n,num=0,dx=0,dy=0;for(var i=0;i<n;i++){var a=xs[i]-mx,b=ys[i]-my;num+=a*b;dx+=a*a;dy+=b*b}return dx&&dy?num/Math.sqrt(dx*dy):null}
+function renderWeightingModels(){
+  var d=activeGex(),box=$("weightingKpis"),host=$("weightingChart"),badge=$("weightingScopeBadge"),note=$("weightingNote");if(!box||!host)return;box.innerHTML="";host.innerHTML="";
+  badge.textContent=state.expiryFilter==="all"?"Cadeia agregada":"Expiry "+new Date(state.expiryFilter+"T12:00:00").toLocaleDateString("pt-BR");
+  if(d.volume_gamma_total==null||!Array.isArray(d.volume_gamma_strikes)){
+    host.innerHTML='<p class="note heatmap-empty">Este snapshot ainda não possui o proxy gamma ponderado por volume. Selecione um snapshot v7+ ou aguarde a próxima coleta.</p>';note.textContent="OI-weighted continua disponível normalmente; o modelo por volume exige o novo schema.";return
+  }
+  var oiRows=d.strikes||[],vm={};d.volume_gamma_strikes.forEach(function(r){vm[Number(r.k)]=r});var rows=oiRows.map(function(r){var v=vm[Number(r.k)]||{net:0,call:0,put:0};return{k:Number(r.k),oi:Number(r.net||0),vol:Number(v.net||0)}}).filter(function(r){return r.k>=d.spot*(1-state.range)&&r.k<=d.spot*(1+state.range)});
+  var corr=pearson(rows.map(function(r){return r.oi}),rows.map(function(r){return r.vol}));
+  [["OI-weighted total",usd(d.net_gex),"inventário aberto"],["Volume-weighted total",usd(d.volume_gamma_total),"atividade da sessão"],["Wall OI",fmt2.format(d.max_abs_strike),"maior |GEX|"],["Wall Volume",d.volume_max_abs_strike==null?"—":fmt2.format(d.volume_max_abs_strike),"maior |proxy|"],["Correlação por strike",corr==null?"—":fmt2.format(corr),"forma dos perfis"]].forEach(function(k){var el=document.createElement("div");el.className="weighting-kpi";el.innerHTML="<span></span><strong></strong><small></small>";el.children[0].textContent=k[0];el.children[1].textContent=k[1];el.children[2].textContent=k[2];box.appendChild(el)});
+  if(!rows.length)return;
+  var oiMax=Math.max.apply(null,rows.map(function(r){return Math.abs(r.oi)}))||1,volMax=Math.max.apply(null,rows.map(function(r){return Math.abs(r.vol)}))||1,W=1220,H=330,m={l:62,r:18,t:22,b:48},x=function(i){return m.l+i/Math.max(1,rows.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v+100)/200)*(H-m.t-m.b)},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Comparação OI e Volume weighted Gamma"},host);
+  [-100,-50,0,50,100].forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:t===0?"axis":"grid"},svg);svgText(svg,m.l-7,y(t)+4,t+"%",{"text-anchor":"end"})});
+  var oiNorm=rows.map(function(r){return r.oi/oiMax*100}),volNorm=rows.map(function(r){return r.vol/volMax*100});
+  svgEl("path",{d:oiNorm.map(function(v,i){return(i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)}).join(" "),fill:"none",stroke:cssVar("--blue"),"stroke-width":2},svg);
+  svgEl("path",{d:volNorm.map(function(v,i){return(i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)}).join(" "),fill:"none",stroke:cssVar("--orange"),"stroke-width":2},svg);
+  var every=Math.max(1,Math.ceil(rows.length/10));rows.forEach(function(r,i){if(i%every===0||i===rows.length-1)svgText(svg,x(i),H-m.b+16,fmt2.format(r.k),{"text-anchor":"middle"})});
+  legend("weightingLegend",[{name:"OI-weighted GEX · normalizado",color:cssVar("--blue")},{name:"Volume-weighted gamma · normalizado",color:cssVar("--orange")}]);
+  note.textContent="O gráfico normaliza cada perfil pela própria maior magnitude para comparar a forma. Os valores absolutos não devem ser somados: OI representa inventário; volume representa atividade acumulada."
+}
+
 function gammaZones(mapper){
   var d=activeGex(),rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
   for(var i=1;i<rows.length;i++)gap=Math.min(gap,rows[i].k-rows[i-1].k);if(!isFinite(gap))gap=.5;
@@ -1142,7 +1207,7 @@ function priceChart(id,key,mapper,legendId){
   legend(legendId,legendItems);viewStatus(key,all.length)
 }
 function renderPrices(){renderPrice("ewz");renderPrice("win")}
-function renderAll(){renderHeader();renderQuality();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();renderOiControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderScorecard();renderReceipts();renderVolumeAnomaly();renderPutCall();renderSmoothing();renderAutoContext();renderPrices()}
+function renderAll(){renderHeader();renderQuality();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();renderOiControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderScorecard();renderReceipts();renderVolumeAnomaly();renderPutCall();renderSmoothing();renderAutoContext();renderConfluence();renderWeightingModels();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
@@ -1153,7 +1218,7 @@ function init(){
   state.smoothEnabled=savedSmooth==="1";
   if(["slow","medium","fast"].indexOf(savedSmoothSpeed)>=0)state.smoothSpeed=savedSmoothSpeed;
   $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison();renderAdvanced();var d=$("timeMapDateSelect").value;if(d&&state.timeMapCache[d])renderTimeMap(d)});
-  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;state.stressScenario=null;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderVolumeAnomaly();renderPutCall();renderSmoothing();renderAutoContext();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d);var od=$("oiDateSelect").value;if(od)loadOiDelta(od)});
+  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;state.stressScenario=null;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderVolumeAnomaly();renderPutCall();renderSmoothing();renderAutoContext();renderWeightingModels();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d);var od=$("oiDateSelect").value;if(od)loadOiDelta(od)});
   $("timeMapDateSelect").addEventListener("change",function(e){loadTimeMapDay(e.target.value)});
   $("oiDateSelect").addEventListener("change",function(e){loadOiDelta(e.target.value)});
   $("advancedMetricSelect").addEventListener("change",function(e){state.advancedMetric=e.target.value;renderAdvanced()});
@@ -1163,6 +1228,7 @@ function init(){
   $("saveReceiptBtn").addEventListener("click",saveStressReceipt);
   $("exportReceiptsBtn").addEventListener("click",function(){downloadJson("gex-analysis-receipts.json",{version:1,exported_at:new Date().toISOString(),receipts:state.receipts})});
   $("scorecardHorizon").addEventListener("change",renderScorecard);
+  ["confluenceAsset","showAtr","showRsi","showBb"].forEach(function(id){$(id).addEventListener("change",renderConfluence)});
   $("gexSmoothToggle").addEventListener("change",function(e){state.smoothEnabled=e.target.checked;store("gex.smoothEnabled",state.smoothEnabled?"1":"0");renderSmoothing()});
   $("gexSmoothSpeed").addEventListener("change",function(e){state.smoothSpeed=e.target.value;store("gex.smoothSpeed",state.smoothSpeed);renderSmoothing()});
   $("compareBtn").addEventListener("click",loadCompare);

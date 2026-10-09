@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Normalized EWZ Option Event",
+  "type": "object",
+  "required": ["provenance", "underlying", "option_symbol", "expiration", "strike", "option_type"],
+  "properties": {
+    "provenance": {
+      "type": "object",
+      "required": ["provider", "source_timestamp", "received_at", "mode"],
+      "properties": {
+        "provider": {"type": "string"},
+        "source_timestamp": {"type": "string"},
+        "received_at": {"type": "string"},
+        "mode": {"enum": ["delayed", "realtime", "historical", "replay"]},
+        "entitlement": {"type": "string"},
+        "quality_flags": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "underlying": {"const": "EWZ"},
+    "option_symbol": {"type": "string"},
+    "expiration": {"type": "string"},
+    "strike": {"type": "number"},
+    "option_type": {"enum": ["C", "P"]},
+    "bid": {"type": ["number", "null"]},
+    "ask": {"type": ["number", "null"]},
+    "last": {"type": ["number", "null"]},
+    "price": {"type": ["number", "null"]},
+    "size": {"type": ["number", "null"]},
+    "volume": {"type": ["number", "null"]},
+    "open_interest": {"type": ["number", "null"]},
+    "implied_volatility": {"type": ["number", "null"]},
+    "delta": {"type": ["number", "null"]},
+    "gamma": {"type": ["number", "null"]},
+    "aggressor_side": {"enum": ["buy", "sell", null]},
+    "complex_order_id": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

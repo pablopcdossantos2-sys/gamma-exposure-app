@@ -277,6 +277,54 @@ def side_metrics_by_strike(contracts):
     return out
 
 
+def volume_weighted_gamma_by_strike(spot, contracts):
+    """Gamma activity proxy weighted by session volume instead of open interest.
+
+    Same dollar-gamma scale as GEX, but volume is activity, not inventory.
+    Calls are positive and puts negative only to keep visual comparability.
+    """
+    factor = 100.0 * spot * spot * 0.01
+    by = {}
+    for c in contracts:
+        strike = c["strike"]
+        row = by.setdefault(strike, {"call": 0.0, "put": 0.0})
+        gamma = float(c.get("gamma", 0.0) or 0.0)
+        volume = float(c.get("volume", 0.0) or 0.0)
+        value = gamma * volume * factor
+        if c.get("cp") == "C":
+            row["call"] += value
+        else:
+            row["put"] -= value
+    return by
+
+
+def volume_weighted_gamma_metrics(spot, contracts):
+    by = volume_weighted_gamma_by_strike(spot, contracts)
+    rows = []
+    for k, v in sorted(by.items()):
+        rows.append({
+            "k": k,
+            "call": round(v["call"]),
+            "put": round(v["put"]),
+            "net": round(v["call"] + v["put"]),
+        })
+    if not rows:
+        return {
+            "volume_gamma_total": 0,
+            "volume_call_wall": None,
+            "volume_put_wall": None,
+            "volume_max_abs_strike": None,
+            "volume_gamma_strikes": [],
+        }
+    return {
+        "volume_gamma_total": round(sum(r["net"] for r in rows)),
+        "volume_call_wall": max(rows, key=lambda r: r["call"])["k"],
+        "volume_put_wall": min(rows, key=lambda r: r["put"])["k"],
+        "volume_max_abs_strike": max(rows, key=lambda r: abs(r["net"]))["k"],
+        "volume_gamma_strikes": rows,
+    }
+
+
 def merge_activity_metrics(result, activity_contracts):
     """Overlay volume/activity metrics from the full valid chain.
 
@@ -306,6 +354,14 @@ def merge_activity_metrics(result, activity_contracts):
 
     result["strikes"] = sorted(result.get("strikes", []), key=lambda r: r["k"])
     result.update(put_call_metrics(activity_contracts))
+    volume_gamma = volume_weighted_gamma_metrics(result.get("spot", 0), activity_contracts)
+    result.update(volume_gamma)
+    by_volume = {float(r["k"]): r for r in volume_gamma.get("volume_gamma_strikes", [])}
+    for row in result.get("strikes", []):
+        vr = by_volume.get(float(row["k"]), {})
+        row["volume_gamma_call"] = vr.get("call", 0)
+        row["volume_gamma_put"] = vr.get("put", 0)
+        row["volume_gamma_net"] = vr.get("net", 0)
     result["n_activity_contracts"] = len(activity_contracts)
     return result
 

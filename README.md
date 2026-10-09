@@ -84,6 +84,34 @@ Para métricas de volume, o coletor agora usa a chain válida completa, incluind
 
 Enquanto ainda não houver três sessões históricas anteriores compatíveis, o painel de volume anômalo informa **baseline insuficiente** em vez de gerar um sinal artificial.
 
+## Confluências de preço e OI-weighted × Volume-weighted
+
+O dashboard inclui também:
+
+- **ATR(14), RSI(14) e Bandas de Bollinger(20, 2σ)** sobre os candles de EWZ ou WIN1!, como camada opcional e totalmente separada do cálculo de GEX.
+- **Comparação OI-weighted × Volume-weighted Gamma:** o GEX por OI representa inventário aberto; o segundo modelo é um proxy de atividade que pondera gamma pelo volume acumulado da sessão.
+- A comparação dos dois modelos usa perfis normalizados para estudar forma/concentração sem fingir equivalência de escala.
+- Totais brutos, maior |GEX|/|proxy| e correlação por strike permanecem visíveis.
+
+O proxy por volume não identifica agressor nem posição dealer e nunca é somado ao GEX por OI.
+
+## Laboratório isolado para dados pagos/licenciados
+
+O repositório contém também `experimental/paid-data-architecture/`, que **não é carregado pelo dashboard nem pelos coletores gratuitos**.
+
+Esse laboratório já possui:
+- modelos normalizados de eventos de opções EWZ e microestrutura WINFUT;
+- contrato provider-neutral e declaração de capabilities;
+- provider mock;
+- signed delta/gamma flow com provenance da classificação;
+- event store JSONL e replay determinístico;
+- cost guard para backfill histórico;
+- primitivas de trade pressure e book imbalance;
+- schemas JSON;
+- testes e workflow de CI próprios.
+
+Ele existe para desenvolver antecipadamente ideias que exigem feed real-time, signed flow, backfill licenciado ou book/trades oficiais, sem incorporá-las ao sistema ativo antes de haver licença, entitlement e orçamento.
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:
