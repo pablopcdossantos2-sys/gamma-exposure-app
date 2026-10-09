@@ -312,6 +312,87 @@
     <div class="receipts-list" id="receiptsList"></div>
   </section>
 
+  <section class="card volume-anomaly-card" data-help="volume-anomaly">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Atividade de opções</p>
+        <h2>Volume anômalo · Strike × Expiry</h2>
+        <p class="note">Compara o volume acumulado atual com sessões anteriores no mesmo contrato lógico (expiry + strike + call/put) e em horário semelhante.</p>
+      </div>
+      <span class="pill" id="volumeBaselineBadge">Calculando baseline…</span>
+    </div>
+    <div class="volume-anomaly-summary" id="volumeAnomalySummary"></div>
+    <div class="table-scroll">
+      <table id="volumeAnomalyTable">
+        <thead><tr><th>#</th><th>Expiry</th><th>Strike</th><th>Lado</th><th class="num">Volume atual</th><th class="num">Mediana</th><th class="num">Robust z</th><th class="num">Atual / base</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="config-hint" id="volumeAnomalyNote"></p>
+  </section>
+
+  <section class="card putcall-card" data-help="put-call">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Composição da cadeia</p>
+        <h2>Put / Call Ratios</h2>
+        <p class="note">Compara puts e calls por open interest e volume. Razões são contexto de composição, não sinais direcionais automáticos.</p>
+      </div>
+      <span class="pill" id="putCallScopeBadge">—</span>
+    </div>
+    <div class="putcall-kpis" id="putCallKpis"></div>
+    <div class="dual-chart-grid">
+      <div>
+        <h3>Razão por vencimento</h3>
+        <div class="legend" id="putCallExpiryLegend"></div>
+        <div class="chart ratio-chart" id="putCallExpiryChart"></div>
+      </div>
+      <div>
+        <h3>Histórico intradiário</h3>
+        <div class="legend" id="putCallHistoryLegend"></div>
+        <div class="chart ratio-chart" id="putCallHistoryChart"></div>
+      </div>
+    </div>
+    <p class="config-hint" id="putCallNote"></p>
+  </section>
+
+  <section class="card smoothing-card" data-help="gex-smoothing">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Série temporal</p>
+        <h2>Net GEX bruto + suavizado</h2>
+        <p class="note">O valor bruto permanece sempre visível. A curva suavizada é opcional e serve apenas para revelar tendência da série.</p>
+      </div>
+      <div class="smoothing-controls">
+        <label class="check-label"><input type="checkbox" id="gexSmoothToggle"> Mostrar suavizado</label>
+        <label class="sel">Responsividade
+          <select id="gexSmoothSpeed">
+            <option value="slow">Lenta</option>
+            <option value="medium" selected>Média</option>
+            <option value="fast">Rápida</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="smoothing-status" id="smoothingStatus"></div>
+    <div class="legend" id="smoothingLegend"></div>
+    <div class="chart smoothing-chart" id="gexSmoothingChart"></div>
+    <p class="config-hint">O filtro não altera KPIs, Walls, Flip ou qualquer cálculo original; ele é somente uma camada visual.</p>
+  </section>
+
+  <section class="card auto-context-card" data-help="auto-context">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Leitura assistida</p>
+        <h2>Contexto automático da leitura</h2>
+        <p class="note">Resumo determinístico das métricas atuais, escrito em linguagem simples e sem transformar contexto estrutural em previsão.</p>
+      </div>
+      <span class="pill" id="contextScopeBadge">—</span>
+    </div>
+    <div class="context-list" id="autoContextList"></div>
+    <p class="config-hint" id="autoContextNote"></p>
+  </section>
+
   <section class="card display-config" data-help="display-settings">
     <div class="card-head">
       <div>
