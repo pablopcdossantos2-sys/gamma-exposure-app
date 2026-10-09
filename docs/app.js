@@ -481,7 +481,7 @@ function priceChart(id,key,mapper,legendId){
   legend(legendId,legendItems);viewStatus(key,all.length)
 }
 function renderPrices(){renderPrice("ewz");renderPrice("win")}
-function renderAll(){renderHeader();renderKpis();renderTable();renderViewControls();renderSnapshotControls();chartGex();renderPrices()}
+function renderAll(){renderHeader();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();chartGex();chartHeatmap();renderComparison();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
@@ -489,7 +489,10 @@ function init(){
   if(["levels","intensity","both"].indexOf(savedMode)>=0)state.viewMode=savedMode;
   if([3,5,7,10].indexOf(savedCount)>=0)state.zoneCount=savedCount;
   if(["low","medium","high"].indexOf(savedOpacity)>=0)state.zoneOpacity=savedOpacity;
-  $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex()});
+  $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison()});
+  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderPrices()});
+  $("compareBtn").addEventListener("click",loadCompare);
+  $("compareSwapBtn").addEventListener("click",function(){var a=$("compareASelect").value,b=$("compareBSelect").value;$("compareASelect").value=b;$("compareBSelect").value=a;loadCompare()});
   document.querySelectorAll(".chart-tool").forEach(function(btn){btn.addEventListener("click",function(){adjustChartView(btn.getAttribute("data-chart"),btn.getAttribute("data-action"))})});
   $("snapshotDateSelect").addEventListener("change",function(e){populateSnapshotTimes(e.target.value,null);var ga=$("snapshotTimeSelect").value,entry=snapshotEntries().find(function(s){return s.generated_at===ga});loadSnapshotEntry(entry)});
   $("snapshotTimeSelect").addEventListener("change",function(e){var entry=snapshotEntries().find(function(s){return s.generated_at===e.target.value});loadSnapshotEntry(entry)});
