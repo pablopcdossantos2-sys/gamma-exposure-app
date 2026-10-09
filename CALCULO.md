@@ -37,3 +37,115 @@ A razão embute dólar e base do futuro, então varia ao longo do dia; use o WIN
 
 ## 5. Limitações
 CBOE com ~15 min de atraso; OI atualizado uma vez por dia; EWZ é proxy do Ibovespa em dólares; o modelo supõe a posição dos dealers.
+
+
+## 6. Max Pain
+
+Calculado **por vencimento**.
+
+Para cada strike candidato de liquidação `S*`, somamos o payout intrínseco de todas as opções daquele expiry:
+
+    payout_calls = Σ max(S* - strike, 0) × OI × 100
+    payout_puts  = Σ max(strike - S*, 0) × OI × 100
+
+O **Max Pain** é o strike candidato com o menor payout agregado.
+
+Interpretação: é uma referência estrutural baseada no open interest do vencimento. Não é uma previsão nem implica que o preço vá convergir para esse nível.
+
+Quando a interface está em “Todos os vencimentos”, o painel usa o **expiry mais próximo** como referência; não misturamos vencimentos diferentes em um único Max Pain.
+
+## 7. Expected Move
+
+Método preferencial, por vencimento:
+
+    Expected Move ≈ mid da call ATM + mid da put ATM
+
+onde o mid é `(bid + ask) / 2`. O strike ATM é o strike comum a call/put mais próximo do spot.
+
+Faixa exibida:
+
+    limite inferior = spot - Expected Move
+    limite superior = spot + Expected Move
+
+Quando um straddle ATM utilizável não está disponível, usamos o fallback:
+
+    Expected Move ≈ spot × IV_ATM × sqrt(T)
+
+com `T` em anos.
+
+A utilização do preço do straddle ATM como aproximação do movimento esperado é uma convenção educacional comum; a própria Options Industry Council descreve o preço do straddle ATM dividido pelo preço do ativo como uma estimativa aproximada do movimento esperado.
+
+## 8. DEX, Vanna e Charm
+
+Essas métricas são mantidas **separadas da convenção de sinal do GEX**.
+
+### 8.1 DEX
+
+Proxy de dealer delta exposure:
+
+    DEX = posição_assumida × delta × OI × 100 × spot
+
+Nesta versão:
+
+    posição_assumida = -1
+
+ou seja, usamos uma hipótese simplificada de dealer **short das opções** dos dois lados.
+
+Isso produz:
+- calls: contribuição DEX normalmente negativa;
+- puts: como o delta da put é negativo, a contribuição normalmente fica positiva.
+
+O DEX representa notional de delta sob essa hipótese — não uma observação da carteira real dos dealers.
+
+### 8.2 Vanna Exposure
+
+Vanna mede a sensibilidade do delta a mudanças de volatilidade:
+
+    Vanna = ∂Delta / ∂σ
+
+Usamos Black-Scholes com `r = 0`, consistente com o cálculo de gamma hipotético já usado no projeto.
+
+A exposição mostrada é aproximada para **+1 ponto de volatilidade**:
+
+    Vanna Exposure =
+        posição_assumida × Vanna × 0,01 × OI × 100 × spot
+
+### 8.3 Charm Exposure
+
+Charm mede a alteração do delta com a passagem do tempo. Usamos a convenção trader de **um dia decorrido**.
+
+    Charm Exposure =
+        posição_assumida × Charm_por_dia × OI × 100 × spot
+
+Interpretação:
+- DEX: direção/magnitude do notional delta do proxy;
+- Vanna: quanto esse notional delta tende a mudar se a IV variar;
+- Charm: quanto tende a mudar mecanicamente com a passagem de um dia.
+
+Cboe descreve Delta, Gamma, Vega e Theta como sensibilidades distintas de risco; Vanna e Charm são Greeks de ordem superior derivados do mesmo arcabouço de sensibilidade. No dashboard, eles são contexto estrutural, não sinais de entrada.
+
+## 9. Mapa temporal Time × Strike
+
+Cada snapshot preserva o perfil de GEX por strike. O mapa temporal:
+
+- eixo X = horário de coleta;
+- eixo Y = strike;
+- cor = sinal do GEX líquido;
+- intensidade = `|GEX|` relativo dentro da visualização;
+- borda azul = Call Wall do snapshot;
+- borda laranja = Put Wall do snapshot;
+- coluna destacada = snapshot mais próximo da abertura normal do WIN.
+
+Se um vencimento específico estiver selecionado, o mapa usa apenas snapshots que já possuam decomposição daquele expiry. Snapshots antigos sem `expiry_profiles` não são silenciosamente misturados.
+
+## 10. Dados guardados após snapshot v3
+
+Além dos campos anteriores, novos snapshots preservam:
+
+- perfis de GEX por vencimento;
+- DEX, Vanna e Charm por strike;
+- totais Net DEX / Net Vanna / Net Charm;
+- Max Pain por expiry;
+- Expected Move, fonte do cálculo e limites superior/inferior.
+
+Snapshots anteriores continuam compatíveis, porém essas métricas podem aparecer como indisponíveis.
