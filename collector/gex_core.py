@@ -236,17 +236,183 @@ def expected_move(spot, contracts):
     }
 
 
+def side_metrics_by_strike(contracts):
+    """OI/volume/IV/delta separated by call/put for each strike."""
+    by = {}
+    for c in contracts:
+        row = by.setdefault(c["strike"], {
+            "oi_call": 0.0, "oi_put": 0.0,
+            "volume_call": 0.0, "volume_put": 0.0,
+            "_iv_call_num": 0.0, "_iv_call_den": 0.0,
+            "_iv_put_num": 0.0, "_iv_put_den": 0.0,
+            "_delta_call_num": 0.0, "_delta_call_den": 0.0,
+            "_delta_put_num": 0.0, "_delta_put_den": 0.0,
+        })
+        side = "call" if c["cp"] == "C" else "put"
+        oi = float(c.get("oi", 0.0) or 0.0)
+        vol = float(c.get("volume", 0.0) or 0.0)
+        iv = float(c.get("iv", 0.0) or 0.0)
+        delta = float(c.get("delta", 0.0) or 0.0)
+        row[f"oi_{side}"] += oi
+        row[f"volume_{side}"] += vol
+        if iv > 0 and oi > 0:
+            row[f"_iv_{side}_num"] += iv * oi
+            row[f"_iv_{side}_den"] += oi
+        if oi > 0:
+            row[f"_delta_{side}_num"] += delta * oi
+            row[f"_delta_{side}_den"] += oi
+
+    out = {}
+    for strike, row in by.items():
+        out[strike] = {
+            "oi_call": round(row["oi_call"]),
+            "oi_put": round(row["oi_put"]),
+            "volume_call": round(row["volume_call"]),
+            "volume_put": round(row["volume_put"]),
+            "iv_call": round(row["_iv_call_num"] / row["_iv_call_den"], 6) if row["_iv_call_den"] else None,
+            "iv_put": round(row["_iv_put_num"] / row["_iv_put_den"], 6) if row["_iv_put_den"] else None,
+            "delta_call": round(row["_delta_call_num"] / row["_delta_call_den"], 6) if row["_delta_call_den"] else None,
+            "delta_put": round(row["_delta_put_num"] / row["_delta_put_den"], 6) if row["_delta_put_den"] else None,
+        }
+    return out
+
+
+def iv_skew_metrics(spot, contracts):
+    """ATM IV, 25-delta risk reversal and butterfly for one expiry."""
+    valid = [c for c in contracts if c.get("iv", 0) and c.get("iv", 0) > 0]
+    if not valid:
+        return {
+            "atm_iv_pct": None, "atm_iv_strike": None,
+            "call25_iv_pct": None, "put25_iv_pct": None,
+            "call25_strike": None, "put25_strike": None,
+            "rr25_vol_points": None, "bf25_vol_points": None,
+        }
+
+    calls = [c for c in valid if c["cp"] == "C"]
+    puts = [c for c in valid if c["cp"] == "P"]
+    common = sorted(set(c["strike"] for c in calls).intersection(c["strike"] for c in puts))
+
+    atm_iv = None
+    atm_strike = None
+    if common:
+        atm_strike = min(common, key=lambda k: abs(k - spot))
+        civs = [c["iv"] for c in calls if c["strike"] == atm_strike and c["iv"] > 0]
+        pivs = [c["iv"] for c in puts if c["strike"] == atm_strike and c["iv"] > 0]
+        ivs = civs[:1] + pivs[:1]
+        if ivs:
+            atm_iv = sum(ivs) / len(ivs)
+
+    def normalized_delta(c):
+        d = float(c.get("delta", 0.0) or 0.0)
+        if abs(d) < 1e-8:
+            d = bs_delta(spot, c["strike"], c["t"], c["iv"], c["cp"])
+        return d
+
+    call25 = min(calls, key=lambda c: abs(normalized_delta(c) - 0.25)) if calls else None
+    put25 = min(puts, key=lambda c: abs(abs(normalized_delta(c)) - 0.25)) if puts else None
+    c25 = call25["iv"] if call25 else None
+    p25 = put25["iv"] if put25 else None
+
+    rr = (c25 - p25) * 100.0 if c25 is not None and p25 is not None else None
+    bf = ((c25 + p25) / 2.0 - atm_iv) * 100.0 if c25 is not None and p25 is not None and atm_iv is not None else None
+
+    return {
+        "atm_iv_pct": round(atm_iv * 100.0, 3) if atm_iv is not None else None,
+        "atm_iv_strike": atm_strike,
+        "call25_iv_pct": round(c25 * 100.0, 3) if c25 is not None else None,
+        "put25_iv_pct": round(p25 * 100.0, 3) if p25 is not None else None,
+        "call25_strike": call25["strike"] if call25 else None,
+        "put25_strike": put25["strike"] if put25 else None,
+        "rr25_vol_points": round(rr, 3) if rr is not None else None,
+        "bf25_vol_points": round(bf, 3) if bf is not None else None,
+    }
+
+
+def compute_term_structure(profiles):
+    """Summarize ATM-IV term structure from per-expiry profiles."""
+    valid = [p for p in profiles if p.get("atm_iv_pct") is not None and p.get("dte") is not None]
+    valid.sort(key=lambda p: p.get("dte", 0))
+    if not valid:
+        return {"points": [], "slope_30d_vol_points": None, "regime": "insufficient"}
+
+    points = [{
+        "expiration": p.get("expiration"),
+        "dte": p.get("dte"),
+        "atm_iv_pct": p.get("atm_iv_pct"),
+        "rr25_vol_points": p.get("rr25_vol_points"),
+        "bf25_vol_points": p.get("bf25_vol_points"),
+    } for p in valid]
+
+    if len(valid) < 2:
+        return {"points": points, "slope_30d_vol_points": None, "regime": "insufficient"}
+
+    front = valid[0]
+    candidates = [p for p in valid[1:] if p.get("dte", 0) > front.get("dte", 0)]
+    target = min(candidates, key=lambda p: abs(p.get("dte", 0) - 30)) if candidates else None
+    if target is None:
+        return {"points": points, "slope_30d_vol_points": None, "regime": "insufficient"}
+
+    dd = target["dte"] - front["dte"]
+    slope = ((target["atm_iv_pct"] - front["atm_iv_pct"]) / dd) * 30.0 if dd > 0 else None
+    if slope is None:
+        regime = "insufficient"
+    elif slope > 0.5:
+        regime = "contango"
+    elif slope < -0.5:
+        regime = "backwardation"
+    else:
+        regime = "flat"
+
+    return {
+        "points": points,
+        "front_expiration": front.get("expiration"),
+        "front_dte": front.get("dte"),
+        "front_atm_iv_pct": front.get("atm_iv_pct"),
+        "reference_expiration": target.get("expiration"),
+        "reference_dte": target.get("dte"),
+        "reference_atm_iv_pct": target.get("atm_iv_pct"),
+        "slope_30d_vol_points": round(slope, 3) if slope is not None else None,
+        "regime": regime,
+    }
+
+
+def oi_delta_by_strike(previous_strikes, current_strikes):
+    """Daily OI change by strike from two compatible expiry profiles."""
+    prev = {float(r["k"]): r for r in (previous_strikes or [])}
+    cur = {float(r["k"]): r for r in (current_strikes or [])}
+    strikes = sorted(set(prev).union(cur))
+    out = []
+    for k in strikes:
+        a, b = prev.get(k, {}), cur.get(k, {})
+        prev_call = float(a.get("oi_call", 0) or 0)
+        prev_put = float(a.get("oi_put", 0) or 0)
+        cur_call = float(b.get("oi_call", 0) or 0)
+        cur_put = float(b.get("oi_put", 0) or 0)
+        dc, dp = cur_call - prev_call, cur_put - prev_put
+        out.append({
+            "k": k,
+            "d_call": round(dc),
+            "d_put": round(dp),
+            "d_net": round(dc - dp),
+            "oi_call": round(cur_call),
+            "oi_put": round(cur_put),
+        })
+    return out
+
+
 def compute(spot, contracts):
     """Retorna niveis GEX e exposicoes avancadas para o conjunto informado."""
     by = gex_by_strike(spot, contracts)
     net = {k: v["call"] + v["put"] for k, v in by.items()}
     adv, adv_totals = advanced_exposures_by_strike(spot, contracts)
+    side = side_metrics_by_strike(contracts)
     curve = gex_curve(spot, contracts)
     expirations = {c.get("expiration") for c in contracts if c.get("expiration")}
 
     rows = []
     for k, v in sorted(by.items()):
         a = adv.get(k, {})
+        sm = side.get(k, {})
         rows.append({
             "k": k,
             "call": round(v["call"]),
@@ -255,6 +421,14 @@ def compute(spot, contracts):
             "dex": round(a.get("dex", 0.0)),
             "vanna": round(a.get("vanna", 0.0)),
             "charm": round(a.get("charm", 0.0)),
+            "oi_call": sm.get("oi_call", 0),
+            "oi_put": sm.get("oi_put", 0),
+            "volume_call": sm.get("volume_call", 0),
+            "volume_put": sm.get("volume_put", 0),
+            "iv_call": sm.get("iv_call"),
+            "iv_put": sm.get("iv_put"),
+            "delta_call": sm.get("delta_call"),
+            "delta_put": sm.get("delta_put"),
         })
 
     result = {
@@ -275,6 +449,7 @@ def compute(spot, contracts):
         result["max_pain"] = pain
         result["max_pain_payout"] = round(payout) if payout is not None else None
         result.update(expected_move(spot, contracts))
+        result.update(iv_skew_metrics(spot, contracts))
     else:
         result.update({
             "max_pain": None,
@@ -285,6 +460,14 @@ def compute(spot, contracts):
             "expected_low": None,
             "expected_high": None,
             "expected_move_pct": None,
+            "atm_iv_pct": None,
+            "atm_iv_strike": None,
+            "call25_iv_pct": None,
+            "put25_iv_pct": None,
+            "call25_strike": None,
+            "put25_strike": None,
+            "rr25_vol_points": None,
+            "bf25_vol_points": None,
         })
     return result
 

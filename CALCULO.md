@@ -149,3 +149,90 @@ Além dos campos anteriores, novos snapshots preservam:
 - Expected Move, fonte do cálculo e limites superior/inferior.
 
 Snapshots anteriores continuam compatíveis, porém essas métricas podem aparecer como indisponíveis.
+
+
+## 11. IV Skew e Term Structure
+
+Para cada vencimento:
+
+- **IV ATM**: média entre IV da call e da put no strike comum mais próximo do spot.
+- **Call 25Δ**: contrato call cuja delta está mais próxima de +0,25.
+- **Put 25Δ**: contrato put cuja |delta| está mais próxima de 0,25.
+- **Risk Reversal 25Δ**:
+
+    RR25 = IV(Call 25Δ) - IV(Put 25Δ)
+
+  Valor negativo significa puts 25Δ mais caras em volatilidade que calls 25Δ.
+
+- **Butterfly 25Δ**:
+
+    BF25 = (IV(Call 25Δ) + IV(Put 25Δ))/2 - IV_ATM
+
+A **Term Structure** usa a IV ATM de cada expiry. Para um resumo comparável, calculamos uma inclinação normalizada em vol points por 30 dias entre o vencimento mais próximo e o vencimento disponível mais próximo de 30 DTE:
+
+    slope_30d = (IV_ref - IV_front) / (DTE_ref - DTE_front) × 30
+
+Classificação descritiva:
+- acima de +0,5 vol point/30d: contango;
+- abaixo de −0,5: backwardation;
+- entre os limites: flat.
+
+Isso descreve a forma da curva de IV, não prevê direção do EWZ/WIN.
+
+## 12. ΔOI entre sessões
+
+A partir do snapshot v4, cada strike/expiry guarda separadamente:
+
+- OI calls;
+- OI puts;
+- volume calls;
+- volume puts;
+- IV e delta por lado.
+
+Para duas sessões consecutivas:
+
+    ΔOI_call = OI_call_atual - OI_call_anterior
+    ΔOI_put  = OI_put_atual  - OI_put_anterior
+    ΔOI_net  = ΔOI_call - ΔOI_put
+
+O painel **não calcula ΔOI entre dois horários do mesmo dia**. A comparação é feita somente entre sessões/datas diferentes, porque open interest é um estoque de posições abertas, não uma medida intradiária contínua.
+
+Se uma das sessões foi gravada antes do snapshot v4 e não possui OI por strike, o painel informa indisponibilidade em vez de estimar valores.
+
+## 13. Qualidade e freshness dos dados
+
+Cada snapshot v4+ contém um objeto `quality` com:
+
+- timestamp da fonte;
+- timestamp da coleta;
+- idade técnica em segundos;
+- sessão de mercado em Nova York;
+- quantidade de contratos/calls/puts;
+- expiries e strikes;
+- cobertura de IV;
+- cobertura bid/ask;
+- percentual da chain com OI positivo;
+- flags de qualidade;
+- status `ok`, `warning` ou `critical`.
+
+### Idade técnica ≠ real-time
+
+A idade técnica mede apenas:
+
+    momento da coleta - timestamp informado pela fonte
+
+Ela **não remove nem estima o atraso de distribuição/licenciamento do feed público**. O dashboard continua rotulando a fonte CBOE como delayed.
+
+### Flags atuais
+
+Podem incluir:
+
+- `chain_incomplete`;
+- `low_contract_count`;
+- `low_iv_coverage`;
+- `partial_iv_coverage`;
+- `source_timestamp_missing`;
+- `source_timestamp_old`;
+- `source_timestamp_very_old`.
+
+O front-end também incorpora avisos do coletor de preços quando EWZ/WIN estão stale ou apresentam erro.

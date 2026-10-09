@@ -44,6 +44,19 @@ Quando “Todos os vencimentos” está selecionado, Max Pain e Expected Move us
 
 As convenções completas estão em [CALCULO.md](CALCULO.md).
 
+## IV Skew, Term Structure, ΔOI e qualidade dos dados
+
+O dashboard também inclui:
+
+- **IV Skew por strike:** curvas separadas de IV de calls e puts no vencimento de referência.
+- **25Δ Risk Reversal e Butterfly:** métricas de assimetria entre puts/calls.
+- **Term Structure:** IV ATM entre vencimentos, com slope normalizado em vol points por 30 dias e leitura descritiva de contango/backwardation/flat.
+- **ΔOI entre sessões:** comparação de open interest call/put por strike entre o dia escolhido e a sessão anterior armazenada. O painel nunca usa dois horários do mesmo dia como substituto.
+- **Qualidade/freshness:** idade técnica do snapshot, sessão de mercado, cobertura de IV/bid-ask/OI, flags e status OK/Atenção/Crítico.
+- O painel distingue explicitamente **idade técnica** de **atraso/licenciamento**: a fonte pública do CBOE continua sendo tratada como delayed.
+
+A partir do snapshot v4, cada strike também preserva OI, volume, IV e delta separados entre calls e puts para sustentar essas análises históricas.
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:

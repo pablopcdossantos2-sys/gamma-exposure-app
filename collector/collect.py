@@ -19,6 +19,7 @@ import gex_core  # noqa: E402
 URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
+MARKET_TZ = ZoneInfo("America/New_York")
 WIN_OPEN_MINUTE = 9 * 60
 
 
@@ -57,6 +58,113 @@ def _load_json(path, default):
         return default
 
 
+def _safe_float(value):
+    try:
+        return float(value or 0)
+    except Exception:
+        return 0.0
+
+
+def _parse_source_timestamp(value):
+    if not value:
+        return None
+    text = str(value).strip()
+    for parser in (
+        lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+        lambda s: datetime.strptime(s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc),
+    ):
+        try:
+            dt = parser(text)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+    return None
+
+
+def assess_quality(raw_data, contracts, now):
+    """Technical data-quality metadata; does not claim the public feed is realtime."""
+    options = raw_data.get("options", []) if isinstance(raw_data, dict) else []
+    source_value = raw_data.get("timestamp") if isinstance(raw_data, dict) else None
+    source_dt = _parse_source_timestamp(source_value)
+    age = max(0, int((now - source_dt.astimezone(timezone.utc)).total_seconds())) if source_dt else None
+
+    total = len(options)
+    valid_iv = sum(1 for o in options if _safe_float(o.get("iv")) > 0)
+    valid_quote = sum(
+        1 for o in options
+        if _safe_float(o.get("bid")) > 0
+        and _safe_float(o.get("ask")) >= _safe_float(o.get("bid"))
+    )
+    with_oi = sum(1 for o in options if _safe_float(o.get("open_interest")) > 0)
+
+    calls = sum(1 for x in contracts if x.get("cp") == "C")
+    puts = sum(1 for x in contracts if x.get("cp") == "P")
+    expiries = len({x.get("expiration") for x in contracts if x.get("expiration")})
+    strikes = len({x.get("strike") for x in contracts})
+
+    now_ny = now.astimezone(MARKET_TZ)
+    minute = now_ny.hour * 60 + now_ny.minute
+    if now_ny.weekday() >= 5:
+        session = "weekend"
+    elif 570 <= minute < 960:
+        session = "regular"
+    elif minute < 570:
+        session = "pre_market"
+    else:
+        session = "after_hours"
+
+    iv_pct = round(valid_iv / total * 100.0, 1) if total else 0.0
+    quote_pct = round(valid_quote / total * 100.0, 1) if total else 0.0
+    oi_pct = round(with_oi / total * 100.0, 1) if total else 0.0
+
+    flags = []
+    severity = "ok"
+    if total == 0 or not contracts or calls == 0 or puts == 0:
+        flags.append("chain_incomplete")
+        severity = "critical"
+    if len(contracts) < 100 and severity != "critical":
+        flags.append("low_contract_count")
+        severity = "warning"
+    if iv_pct < 60:
+        flags.append("low_iv_coverage")
+        severity = "critical" if iv_pct < 35 else "warning"
+    elif iv_pct < 80:
+        flags.append("partial_iv_coverage")
+        if severity == "ok":
+            severity = "warning"
+    if age is None:
+        flags.append("source_timestamp_missing")
+        if severity == "ok":
+            severity = "warning"
+    elif age > 3600:
+        flags.append("source_timestamp_very_old")
+        severity = "critical"
+    elif age > 1200:
+        flags.append("source_timestamp_old")
+        if severity == "ok":
+            severity = "warning"
+
+    return {
+        "status": severity,
+        "flags": flags,
+        "source_timestamp": source_value,
+        "source_age_seconds": age,
+        "collection_timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "market_session_ny": session,
+        "market_time_ny": now_ny.isoformat(),
+        "public_delayed_source": True,
+        "contracts_used": len(contracts),
+        "raw_options": total,
+        "calls_used": calls,
+        "puts_used": puts,
+        "expiries": expiries,
+        "strikes": strikes,
+        "iv_coverage_pct": iv_pct,
+        "bid_ask_coverage_pct": quote_pct,
+        "open_interest_positive_pct": oi_pct,
+    }
+
+
 def archive_snapshot(latest, outdir, now):
     """Guarda uma fotografia navegável da coleta sem a curva de 161 pontos."""
     local = now.astimezone(LOCAL_TZ)
@@ -66,7 +174,7 @@ def archive_snapshot(latest, outdir, now):
 
     snap = dict(latest)
     snap.pop("curve", None)
-    snap["snapshot_version"] = 3
+    snap["snapshot_version"] = 4
     snap["snapshot_timezone"] = "America/Sao_Paulo"
 
     rel_file = f"data/gex-snapshots/{day}/{hhmmss}.json"
@@ -97,6 +205,9 @@ def archive_snapshot(latest, outdir, now):
         "cboe_timestamp": latest.get("cboe_timestamp"),
         "distance_to_win_open_minutes": round(abs(minute - WIN_OPEN_MINUTE), 2),
         "is_win_open_reference": False,
+        "snapshot_version": latest.get("snapshot_version", 4),
+        "quality_status": (latest.get("quality") or {}).get("status"),
+        "source_age_seconds": (latest.get("quality") or {}).get("source_age_seconds"),
     })
 
     # Em cada dia, marca somente o snapshot cuja coleta ficou mais próxima de 09:00 BRT.
@@ -141,6 +252,8 @@ def main():
         raise RuntimeError("Chain vazia apos filtros.")
     res = gex_core.compute(spot, contracts)
     expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts)
+    term_structure = gex_core.compute_term_structure(expiry_profiles)
+    quality = assess_quality(raw["data"], contracts, now)
 
     latest = {
         "symbol": symbol,
@@ -149,7 +262,10 @@ def main():
         "cboe_timestamp": raw["data"].get("timestamp") or raw.get("timestamp"),
         "max_dte": a.max_dte,
         "raw_file": raw_file,
+        "snapshot_version": 4,
         "expiry_profiles": expiry_profiles,
+        "term_structure": term_structure,
+        "quality": quality,
         **res,
     }
     write_json(os.path.join(a.outdir, "latest.json"), latest)

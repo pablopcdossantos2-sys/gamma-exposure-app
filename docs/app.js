@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null};
+var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null,oiCache:{},oiLoading:null};
 var dragState=null,dragRAF=null;
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -437,6 +437,169 @@ function renderTimeMap(day){
   })
 }
 
+
+function ageLabel(seconds){
+  if(seconds==null)return"—";
+  if(seconds<60)return seconds+" s";
+  if(seconds<3600)return Math.round(seconds/60)+" min";
+  return fmt2.format(seconds/3600)+" h"
+}
+function qualityFlagLabel(flag){
+  var map={
+    chain_incomplete:"Chain incompleta",
+    low_contract_count:"Poucos contratos utilizáveis",
+    low_iv_coverage:"Cobertura de IV muito baixa",
+    partial_iv_coverage:"Cobertura de IV parcial",
+    source_timestamp_missing:"Timestamp da fonte ausente",
+    source_timestamp_old:"Timestamp da fonte antigo",
+    source_timestamp_very_old:"Timestamp da fonte muito antigo"
+  };
+  return map[flag]||flag
+}
+function renderQuality(){
+  var q=state.gex&&state.gex.quality,box=$("qualityGrid"),flags=$("qualityFlags"),status=$("qualityStatus");
+  if(!box||!flags||!status)return;
+  box.innerHTML="";flags.innerHTML="";
+  if(!q){
+    status.textContent="Snapshot legado";status.className="quality-status warning";
+    box.innerHTML='<p class="note">Este snapshot foi criado antes do painel de qualidade. Selecione uma coleta v4 ou mais recente.</p>';
+    return
+  }
+  var priceIssues=[],p=state.prices;
+  if(p&&p.errors&&p.errors.length)priceIssues=priceIssues.concat(p.errors);
+  if(p&&p.ewz&&p.ewz.stale)priceIssues.push("EWZ com candles anteriores");
+  if(p&&p.win&&p.win.stale)priceIssues.push("WIN com candles anteriores");
+  var severity=q.status||"ok";
+  if(priceIssues.length&&severity==="ok")severity="warning";
+  status.className="quality-status "+severity;
+  status.textContent=severity==="critical"?"Crítico":severity==="warning"?"Atenção":"OK";
+  var cards=[
+    ["Idade técnica",ageLabel(q.source_age_seconds),"timestamp fonte → coleta"],
+    ["Sessão NY",q.market_session_ny||"—","regular / pré / pós"],
+    ["Contratos",fmt0.format(q.contracts_used||0),(q.calls_used||0)+" calls · "+(q.puts_used||0)+" puts"],
+    ["Expiries",fmt0.format(q.expiries||0),fmt0.format(q.strikes||0)+" strikes"],
+    ["IV válida",fmt2.format(q.iv_coverage_pct||0)+"%","sobre opções brutas"],
+    ["Bid/Ask válido",fmt2.format(q.bid_ask_coverage_pct||0)+"%","quotes com ambos os lados"],
+    ["OI > 0",fmt2.format(q.open_interest_positive_pct||0)+"%","opções usadas estruturalmente"],
+    ["Fonte","CBOE público","delayed; não é real-time"]
+  ];
+  cards.forEach(function(m){var d=document.createElement("div");d.className="quality-metric";var a=document.createElement("span");a.textContent=m[0];var b=document.createElement("strong");b.textContent=m[1];var s=document.createElement("small");s.textContent=m[2];d.appendChild(a);d.appendChild(b);d.appendChild(s);box.appendChild(d)});
+  var all=(q.flags||[]).map(qualityFlagLabel).concat(priceIssues);
+  if(!all.length){flags.innerHTML='<span class="quality-chip ok">Nenhuma flag técnica nesta coleta</span>'}
+  else all.forEach(function(x){var s=document.createElement("span");s.className="quality-chip "+(severity==="critical"?"critical":"warning");s.textContent=x;flags.appendChild(s)})
+}
+
+function ivReferenceProfile(){
+  if(!state.gex||!Array.isArray(state.gex.expiry_profiles))return null;
+  var profiles=state.gex.expiry_profiles.filter(function(p){return p.atm_iv_pct!=null});
+  if(state.expiryFilter!=="all")return profiles.find(function(p){return p.expiration===state.expiryFilter})||null;
+  profiles.sort(function(a,b){return(a.dte||0)-(b.dte||0)});
+  return profiles[0]||null
+}
+function derivedTermStructure(){
+  if(state.gex&&state.gex.term_structure&&Array.isArray(state.gex.term_structure.points))return state.gex.term_structure;
+  var ps=state.gex&&Array.isArray(state.gex.expiry_profiles)?state.gex.expiry_profiles.filter(function(p){return p.atm_iv_pct!=null}).slice():[];
+  ps.sort(function(a,b){return(a.dte||0)-(b.dte||0)});
+  return{points:ps.map(function(p){return{expiration:p.expiration,dte:p.dte,atm_iv_pct:p.atm_iv_pct,rr25_vol_points:p.rr25_vol_points,bf25_vol_points:p.bf25_vol_points}}),regime:"insufficient",slope_30d_vol_points:null}
+}
+function renderIV(){
+  var p=ivReferenceProfile(),box=$("ivKpis"),skew=$("ivSkewChart"),term=$("termStructureChart"),badge=$("ivExpiryBadge"),note=$("ivStructureNote");
+  if(!box||!skew||!term)return;
+  box.innerHTML="";skew.innerHTML="";term.innerHTML="";
+  if(!p){
+    badge.textContent="sem dados B2";note.textContent="Este snapshot não possui métricas de IV Skew/Term Structure. Novas coletas passam a armazená-las.";return
+  }
+  badge.textContent=new Date(p.expiration+"T12:00:00").toLocaleDateString("pt-BR")+" · "+p.dte+" DTE";
+  var ts=derivedTermStructure(),kpis=[
+    ["IV ATM",p.atm_iv_pct==null?"—":fmt2.format(p.atm_iv_pct)+"%","strike "+(p.atm_iv_strike==null?"—":fmt2.format(p.atm_iv_strike))],
+    ["Put 25Δ",p.put25_iv_pct==null?"—":fmt2.format(p.put25_iv_pct)+"%","strike "+(p.put25_strike==null?"—":fmt2.format(p.put25_strike))],
+    ["Call 25Δ",p.call25_iv_pct==null?"—":fmt2.format(p.call25_iv_pct)+"%","strike "+(p.call25_strike==null?"—":fmt2.format(p.call25_strike))],
+    ["RR 25Δ",p.rr25_vol_points==null?"—":fmt2.format(p.rr25_vol_points)+" vol pts","call IV − put IV"],
+    ["Butterfly 25Δ",p.bf25_vol_points==null?"—":fmt2.format(p.bf25_vol_points)+" vol pts","asas vs ATM"],
+    ["Slope 30d",ts.slope_30d_vol_points==null?"—":fmt2.format(ts.slope_30d_vol_points)+" vol pts",ts.regime||"—"]
+  ];
+  kpis.forEach(function(m){var d=document.createElement("div");d.className="iv-kpi";d.innerHTML="<span></span><strong></strong><small></small>";d.children[0].textContent=m[0];d.children[1].textContent=m[1];d.children[2].textContent=m[2];box.appendChild(d)});
+
+  var rows=(p.strikes||[]).filter(function(s){return s.iv_call!=null||s.iv_put!=null}).filter(function(s){return s.k>=p.spot*(1-state.range)&&s.k<=p.spot*(1+state.range)});
+  if(rows.length>1){
+    var vals=[];rows.forEach(function(s){if(s.iv_call!=null)vals.push(s.iv_call*100);if(s.iv_put!=null)vals.push(s.iv_put*100)});
+    var ymin=Math.min.apply(null,vals),ymax=Math.max.apply(null,vals),pad=(ymax-ymin)*.1||1;ymin-=pad;ymax+=pad;
+    var W=660,H=300,m={l:58,r:16,t:18,b:42},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"IV skew por strike"},skew);
+    var x=function(i){return m.l+i/Math.max(1,rows.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v-ymin)/(ymax-ymin))*(H-m.t-m.b)};
+    niceTicks(ymin,ymax,5).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:"grid"},svg);svgText(svg,m.l-7,y(t)+4,fmt2.format(t)+"%",{"text-anchor":"end"})});
+    function line(field,color){var pts=[];rows.forEach(function(s,i){if(s[field]!=null)pts.push({x:x(i),y:y(s[field]*100),s:s})});if(pts.length>1)svgEl("path",{d:pts.map(function(p,i){return(i?"L":"M")+p.x.toFixed(1)+" "+p.y.toFixed(1)}).join(" "),fill:"none",stroke:color,"stroke-width":2},svg)}
+    line("iv_call",cssVar("--blue"));line("iv_put",cssVar("--orange"));
+    var every=Math.max(1,Math.ceil(rows.length/8));rows.forEach(function(s,i){if(i%every===0||i===rows.length-1)svgText(svg,x(i),H-m.b+16,fmt2.format(s.k),{"text-anchor":"middle"})});
+    rows.forEach(function(s,i){var h=svgEl("rect",{x:x(i)-8,y:m.t,width:16,height:H-m.t-m.b,class:"hit"},svg);h.addEventListener("pointermove",function(e){showTip(e,"Strike "+fmt2.format(s.k),[["Call IV",s.iv_call==null?"—":fmt2.format(s.iv_call*100)+"%"],["Put IV",s.iv_put==null?"—":fmt2.format(s.iv_put*100)+"%"]])});h.addEventListener("pointerleave",hideTip)})
+  }
+  legend("ivSkewLegend",[{name:"Call IV",color:cssVar("--blue")},{name:"Put IV",color:cssVar("--orange")}]);
+
+  var pts=(ts.points||[]).filter(function(x){return x.atm_iv_pct!=null});
+  if(pts.length>1){
+    var W2=660,H2=300,m2={l:58,r:16,t:18,b:58},vmin=Math.min.apply(null,pts.map(function(x){return x.atm_iv_pct})),vmax=Math.max.apply(null,pts.map(function(x){return x.atm_iv_pct})),pd=(vmax-vmin)*.12||1;vmin-=pd;vmax+=pd;
+    var svg2=svgEl("svg",{viewBox:"0 0 "+W2+" "+H2,role:"img","aria-label":"Term structure de IV ATM"},term),x2=function(i){return m2.l+i/Math.max(1,pts.length-1)*(W2-m2.l-m2.r)},y2=function(v){return m2.t+(1-(v-vmin)/(vmax-vmin))*(H2-m2.t-m2.b)};
+    niceTicks(vmin,vmax,5).forEach(function(t){svgEl("line",{x1:m2.l,x2:W2-m2.r,y1:y2(t),y2:y2(t),class:"grid"},svg2);svgText(svg2,m2.l-7,y2(t)+4,fmt2.format(t)+"%",{"text-anchor":"end"})});
+    svgEl("path",{d:pts.map(function(p,i){return(i?"L":"M")+x2(i).toFixed(1)+" "+y2(p.atm_iv_pct).toFixed(1)}).join(" "),fill:"none",stroke:cssVar("--purple"),"stroke-width":2},svg2);
+    pts.forEach(function(p,i){svgEl("circle",{cx:x2(i),cy:y2(p.atm_iv_pct),r:3.5,fill:cssVar("--purple")},svg2);var lab=p.dte+"d";var t=svgText(svg2,x2(i),H2-m2.b+18,lab,{"text-anchor":"end"});t.setAttribute("transform","rotate(-45 "+x2(i)+" "+(H2-m2.b+18)+")")})
+  }
+  legend("termLegend",[{name:"IV ATM por expiry",color:cssVar("--purple")}]);
+  note.textContent="RR25 = Call 25Δ IV − Put 25Δ IV. Valor negativo indica puts 25Δ mais caros em volatilidade. Term Structure usa IV ATM; contango/backwardation descreve forma da curva, não direção futura do preço."
+}
+
+function sessionDates(){
+  var dates=[];snapshotEntries().forEach(function(e){if(dates.indexOf(e.local_date)<0)dates.push(e.local_date)});return dates.sort().reverse()
+}
+function renderOiControls(){
+  var sel=$("oiDateSelect");if(!sel)return;
+  var dates=sessionDates(),keep=sel.value;sel.innerHTML="";
+  dates.forEach(function(d){var o=document.createElement("option");o.value=d;o.textContent=new Date(d+"T12:00:00").toLocaleDateString("pt-BR");sel.appendChild(o)});
+  sel.value=dates.indexOf(keep)>=0?keep:(dates[0]||"");
+  if(sel.value)loadOiDelta(sel.value)
+}
+function representativeEntry(day){
+  var rows=snapshotEntries().filter(function(e){return e.local_date===day}).sort(function(a,b){return b.local_time.localeCompare(a.local_time)});
+  return rows.find(function(e){return(e.snapshot_version||0)>=4})||rows[0]||null
+}
+function oiProfile(snap){
+  if(!snap)return null;
+  if(state.expiryFilter==="all")return snap;
+  if(!Array.isArray(snap.expiry_profiles))return null;
+  return snap.expiry_profiles.find(function(p){return p.expiration===state.expiryFilter})||null
+}
+function loadOiDelta(day){
+  var dates=sessionDates(),idx=dates.indexOf(day),prevDay=idx>=0?dates[idx+1]:null,host=$("oiDeltaChart"),note=$("oiNote");
+  if(!host)return;
+  if(!prevDay){host.innerHTML='<p class="note heatmap-empty">Ainda não há uma sessão anterior armazenada para calcular ΔOI.</p>';$("oiSummary").innerHTML="";note.textContent="O painel será preenchido automaticamente quando houver dois dias de snapshots com OI por strike.";return}
+  var key=day+"|"+prevDay;
+  if(state.oiCache[key]){renderOiDelta(day,prevDay,state.oiCache[key]);return}
+  var cur=representativeEntry(day),prev=representativeEntry(prevDay);
+  if(!cur||!prev){host.innerHTML='<p class="note heatmap-empty">Snapshots insuficientes para comparar as sessões.</p>';return}
+  state.oiLoading=key;host.innerHTML='<p class="note heatmap-empty">Carregando OI das duas sessões…</p>';
+  Promise.all([getJson(cur.file),getJson(prev.file)]).then(function(r){state.oiCache[key]={cur:r[0],prev:r[1],curEntry:cur,prevEntry:prev};renderOiDelta(day,prevDay,state.oiCache[key])}).catch(function(err){host.innerHTML='<p class="note heatmap-empty">Não foi possível carregar ΔOI: '+err.message+'</p>'}).finally(function(){state.oiLoading=null})
+}
+function renderOiDelta(day,prevDay,data){
+  var host=$("oiDeltaChart"),sum=$("oiSummary"),note=$("oiNote");host.innerHTML="";sum.innerHTML="";
+  var cur=oiProfile(data.cur),prev=oiProfile(data.prev);
+  if(!cur||!prev||!(cur.strikes||[]).some(function(s){return s.oi_call!=null})||!(prev.strikes||[]).some(function(s){return s.oi_call!=null})){
+    host.innerHTML='<p class="note heatmap-empty">Uma das sessões foi gravada antes do snapshot v4 e não possui OI por strike.</p>';note.textContent="ΔOI requer duas sessões com o novo schema. Nenhum valor intradiário foi usado como substituto.";return
+  }
+  var a={},b={};(prev.strikes||[]).forEach(function(s){a[s.k]=s});(cur.strikes||[]).forEach(function(s){b[s.k]=s});
+  var ks=Object.keys(Object.assign({},a,b)).map(Number).sort(function(x,y){return x-y}),rows=ks.map(function(k){var x=a[k]||{},y=b[k]||{},dc=(y.oi_call||0)-(x.oi_call||0),dp=(y.oi_put||0)-(x.oi_put||0);return{k:k,d_call:dc,d_put:dp,d_net:dc-dp}});
+  var center=cur.spot||state.gex.spot,lo=center*(1-state.range),hi=center*(1+state.range);rows=rows.filter(function(r){return r.k>=lo&&r.k<=hi});
+  var tc=rows.reduce(function(s,r){return s+r.d_call},0),tp=rows.reduce(function(s,r){return s+r.d_put},0),tn=tc-tp;
+  [["Δ OI Calls",fmt0.format(tc),tc>=0?"aumento":"redução"],["Δ OI Puts",fmt0.format(tp),tp>=0?"aumento":"redução"],["Δ líquido C−P",fmt0.format(tn),"calls menos puts"]].forEach(function(m){var d=document.createElement("div");d.className="oi-kpi";d.innerHTML="<span></span><strong></strong><small></small>";d.children[0].textContent=m[0];d.children[1].textContent=m[1];d.children[2].textContent=m[2];sum.appendChild(d)});
+  if(rows.length){
+    var W=1220,H=330,m={l:62,r:18,t:22,b:48},vmax=Math.max.apply(null,rows.reduce(function(v,r){v.push(Math.abs(r.d_call),Math.abs(r.d_put));return v},[]))*1.12||1,svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Delta OI por strike"},host),x=function(i){return m.l+i/Math.max(1,rows.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v+vmax)/(2*vmax))*(H-m.t-m.b)};
+    niceTicks(-vmax,vmax,6).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:t===0?"axis":"grid"},svg);svgText(svg,m.l-7,y(t)+4,fmt0.format(t),{"text-anchor":"end"})});
+    var step=(W-m.l-m.r)/Math.max(1,rows.length-1),bw=Math.max(3,Math.min(11,step*.32));
+    rows.forEach(function(r,i){[[r.d_call,cssVar("--blue"),-bw],[r.d_put,cssVar("--orange"),0]].forEach(function(v){var yy=y(v[0]);svgEl("rect",{x:x(i)+v[2],y:Math.min(y(0),yy),width:bw,height:Math.max(1,Math.abs(yy-y(0))),fill:v[1],"fill-opacity":.72},svg)})});
+    var every=Math.max(1,Math.ceil(rows.length/10));rows.forEach(function(r,i){if(i%every===0||i===rows.length-1)svgText(svg,x(i),H-m.b+16,fmt2.format(r.k),{"text-anchor":"middle"})});
+    rows.forEach(function(r,i){var h=svgEl("rect",{x:x(i)-step/2,y:m.t,width:Math.max(8,step),height:H-m.t-m.b,class:"hit"},svg);h.addEventListener("pointermove",function(e){showTip(e,"Strike "+fmt2.format(r.k),[["Δ Call OI",fmt0.format(r.d_call)],["Δ Put OI",fmt0.format(r.d_put)],["Δ líquido C−P",fmt0.format(r.d_net)]])});h.addEventListener("pointerleave",hideTip)})
+  }
+  legend("oiLegend",[{name:"Δ OI Calls",color:cssVar("--blue"),cls:"sq"},{name:"Δ OI Puts",color:cssVar("--orange"),cls:"sq"}]);
+  note.textContent=new Date(prevDay+"T12:00:00").toLocaleDateString("pt-BR")+" → "+new Date(day+"T12:00:00").toLocaleDateString("pt-BR")+" · "+(state.expiryFilter==="all"?"todos os vencimentos":"expiry "+new Date(state.expiryFilter+"T12:00:00").toLocaleDateString("pt-BR"))+". OI é comparado entre sessões, não entre horários do mesmo dia."
+}
+
 function gammaZones(mapper){
   var d=activeGex(),rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
   for(var i=1;i<rows.length;i++)gap=Math.min(gap,rows[i].k-rows[i-1].k);if(!isFinite(gap))gap=.5;
@@ -608,7 +771,7 @@ function priceChart(id,key,mapper,legendId){
   legend(legendId,legendItems);viewStatus(key,all.length)
 }
 function renderPrices(){renderPrice("ewz");renderPrice("win")}
-function renderAll(){renderHeader();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderPrices()}
+function renderAll(){renderHeader();renderQuality();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();renderOiControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderIV();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
@@ -617,8 +780,9 @@ function init(){
   if([3,5,7,10].indexOf(savedCount)>=0)state.zoneCount=savedCount;
   if(["low","medium","high"].indexOf(savedOpacity)>=0)state.zoneOpacity=savedOpacity;
   $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison();renderAdvanced();var d=$("timeMapDateSelect").value;if(d&&state.timeMapCache[d])renderTimeMap(d)});
-  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d)});
+  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderIV();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d);var od=$("oiDateSelect").value;if(od)loadOiDelta(od)});
   $("timeMapDateSelect").addEventListener("change",function(e){loadTimeMapDay(e.target.value)});
+  $("oiDateSelect").addEventListener("change",function(e){loadOiDelta(e.target.value)});
   $("advancedMetricSelect").addEventListener("change",function(e){state.advancedMetric=e.target.value;renderAdvanced()});
   $("advancedOverlaySelect").addEventListener("change",function(e){state.advancedOverlay=e.target.value;renderPrices()});
   $("compareBtn").addEventListener("click",loadCompare);
