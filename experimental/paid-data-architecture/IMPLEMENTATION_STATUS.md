@@ -14,6 +14,10 @@ Este laboratório **não faz parte do sistema ativo**. O objetivo é garantir qu
 - signed delta flow, signed gamma flow e hedge-notional proxy;
 - armazenamento append-only JSONL;
 - replay determinístico;
+- cost guard provider-neutral para backfill;
+- métricas básicas de trade pressure e book imbalance do WIN;
+- quality/freshness para streams licenciados;
+- pipeline mínimo provider → store → análise;
 - schemas JSON para opções, WIN e manifestos;
 - testes unitários sem credenciais.
 
@@ -26,10 +30,10 @@ Pronto arquiteturalmente para um adapter WebSocket/streaming que produza `Option
 O motor recebe trades normalizados, preserva a origem do aggressor side e calcula contribuições assinadas. Ainda falta um feed licenciado real.
 
 ### P3 — Historical Backfill
-O adapter pode implementar `fetch_historical(request)`; storage/replay já estão disponíveis. Falta provider/licença e cost guard específico do fornecedor.
+O adapter pode implementar `fetch_historical(request)`; storage/replay e `CostGuard` provider-neutral já estão disponíveis. Falta provider/licença e estimador de custo específico do fornecedor.
 
 ### P4 — WINFUT Microstructure
-`WinEvent` suporta quote, trade e book. A implementação real depende de feed B3/broker/Nelogica ou outro fornecedor com direitos adequados.
+`WinEvent` suporta quote, trade e book. `microstructure.py` já calcula trade pressure, top-of-book imbalance e depth imbalance quando os campos existirem. A implementação real depende de feed B3/broker/Nelogica ou outro fornecedor com direitos adequados.
 
 ## O que NÃO foi feito
 
