@@ -34,6 +34,26 @@ Quando as faixas estiverem ativadas, também é possível escolher:
 
 Essas preferências são salvas no `localStorage` do navegador. O botão **Restaurar padrão** retorna para “Somente níveis principais”, Top 7 e intensidade média.
 
+## Navegação e zoom dos gráficos de preço
+
+Os gráficos de EWZ e WIN têm controles independentes. Em cada um deles o usuário pode:
+
+- **X+ / X−**: aumentar ou reduzir o zoom horizontal, mostrando menos ou mais candles;
+- **← / →**: navegar para candles anteriores ou posteriores;
+- **Y+ / Y−**: aumentar ou reduzir o zoom vertical da escala de preço;
+- **↑ / ↓**: deslocar a janela de preços para cima ou para baixo;
+- **Último**: retornar ao candle mais recente sem alterar os demais níveis de zoom;
+- **Resetar**: remover todo o zoom e deslocamento, retornando à visualização padrão de 130 candles.
+
+Também há interação direta com o gráfico:
+
+- arrastar com **mouse ou caneta** move simultaneamente a janela horizontal e a escala vertical;
+- **Ctrl/⌘ + roda do mouse** controla o zoom horizontal;
+- **Shift + roda do mouse** controla o zoom vertical;
+- **duplo clique** restaura a visualização padrão.
+
+Em telas touch, os botões permanecem como forma principal de navegação para não bloquear a rolagem normal da página. EWZ e WIN mantêm estados de zoom separados durante a sessão.
+
 ## Fontes
 
 - **Gamma Exposure:** chain de opções do CBOE, com cálculo próprio em `collector/gex_core.py`.
