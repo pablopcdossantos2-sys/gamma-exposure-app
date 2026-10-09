@@ -134,5 +134,49 @@ class GexCoreTests(unittest.TestCase):
         self.assertTrue(res["pinning"])
 
 
+    def test_put_call_metrics(self):
+        m = gex_core.put_call_metrics(self.contracts)
+        self.assertEqual(m["call_oi"], 340)
+        self.assertEqual(m["put_oi"], 360)
+        self.assertAlmostEqual(m["put_call_oi_ratio"], 360/340, places=4)
+        self.assertEqual(m["call_volume"], 82)
+        self.assertEqual(m["put_volume"], 88)
+        self.assertAlmostEqual(m["put_call_volume_ratio"], 88/82, places=4)
+
+    def test_compute_contains_put_call_ratios(self):
+        res = gex_core.compute(self.spot, self.contracts)
+        self.assertIn("put_call_oi_ratio", res)
+        self.assertIn("put_call_volume_ratio", res)
+        self.assertGreater(res["put_call_oi_ratio"], 0)
+        self.assertGreater(res["put_call_volume_ratio"], 0)
+
+
+    def test_activity_metrics_include_zero_oi_volume(self):
+        activity = list(self.contracts) + [
+            {"cp": "C", "strike": 110.0, "dte": 10, "expiration": "2026-10-19", "t": 10/365,
+             "iv": .30, "gamma": .01, "oi": 0, "volume": 100, "delta": .10, "bid": .2, "ask": .3, "last": .25}
+        ]
+        res = gex_core.compute(self.spot, self.contracts)
+        gex_core.merge_activity_metrics(res, activity)
+        self.assertEqual(res["call_volume"], 182)
+        row = next(r for r in res["strikes"] if r["k"] == 110.0)
+        self.assertEqual(row["volume_call"], 100)
+        self.assertEqual(row["net"], 0)
+
+    def test_parse_chain_can_keep_zero_oi_for_activity(self):
+        data = {
+            "current_price": 100,
+            "options": [
+                {"option": "EWZ261019C00100000", "open_interest": 0, "volume": 12,
+                 "iv": .2, "gamma": .01, "delta": .2, "bid": 1, "ask": 1.2, "last_trade_price": 1.1}
+            ]
+        }
+        _, gex_contracts = gex_core.parse_chain(data, today=datetime(2026, 10, 9).date())
+        _, activity_contracts = gex_core.parse_chain(data, today=datetime(2026, 10, 9).date(), include_zero_oi=True)
+        self.assertEqual(len(gex_contracts), 0)
+        self.assertEqual(len(activity_contracts), 1)
+        self.assertEqual(activity_contracts[0]["volume"], 12)
+
+
 if __name__ == "__main__":
     unittest.main()

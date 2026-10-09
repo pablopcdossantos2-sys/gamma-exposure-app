@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null,oiCache:{},oiLoading:null,stressScenario:null,receipts:[],scorecard:null};
+var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null,oiCache:{},oiLoading:null,stressScenario:null,receipts:[],scorecard:null,analysisDayCache:{},volumeBaselineCache:{},smoothEnabled:false,smoothSpeed:"medium"};
 var dragState=null,dragRAF=null;
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -768,6 +768,209 @@ function renderReceipts(){
   state.receipts.forEach(function(r){var d=document.createElement("div");d.className="receipt-row";var meta=document.createElement("div");meta.className="receipt-meta";var strong=document.createElement("strong");strong.textContent=new Date(r.created_at).toLocaleString("pt-BR")+" · "+new Date(r.expiry+"T12:00:00").toLocaleDateString("pt-BR");var small=document.createElement("small");small.textContent="spot "+fmtPct.format(r.inputs.spot_pct)+"% · IV "+fmtPct.format(r.inputs.iv_vol_points)+" pts · "+r.inputs.days_elapsed+" dias";meta.appendChild(strong);meta.appendChild(small);var act=document.createElement("div");act.className="receipt-actions";[["Repetir",function(){replayReceipt(r.id)}],["JSON",function(){downloadJson("gex-receipt-"+r.id.replace(/[:.]/g,"-")+".json",r)}],["Excluir",function(){deleteReceipt(r.id)}]].forEach(function(x){var b=document.createElement("button");b.type="button";b.className="ghost";b.textContent=x[0];b.addEventListener("click",x[1]);act.appendChild(b)});d.appendChild(meta);d.appendChild(act);box.appendChild(d)})
 }
 
+
+/* ---------- B6 · Historical abnormal volume ---------- */
+function analysisProfile(snap){
+  if(!snap)return null;
+  if(state.expiryFilter==="all")return snap;
+  if(!Array.isArray(snap.expiry_profiles))return null;
+  return snap.expiry_profiles.find(function(p){return p.expiration===state.expiryFilter})||null
+}
+function profileListForAnomaly(snap){
+  if(!snap)return[];
+  if(state.expiryFilter==="all")return Array.isArray(snap.expiry_profiles)?snap.expiry_profiles:[];
+  var p=analysisProfile(snap);return p?[p]:[]
+}
+function medianValue(values){
+  if(!values.length)return null;var a=values.slice().sort(function(x,y){return x-y}),m=Math.floor(a.length/2);
+  return a.length%2?a[m]:(a[m-1]+a[m])/2
+}
+function robustStats(values,current){
+  var med=medianValue(values);if(med==null)return null;
+  var mad=medianValue(values.map(function(v){return Math.abs(v-med)}))||0;
+  var scale=mad>0?1.4826*mad:Math.max(1,Math.sqrt(med+1));
+  return{median:med,mad:mad,z:(current-med)/scale,ratio:med>0?current/med:(current>0?Infinity:1)}
+}
+function minuteOfDay(t){var p=String(t||"00:00").split(":");return(parseInt(p[0],10)||0)*60+(parseInt(p[1],10)||0)}
+function representativeAtClock(day,targetMinute){
+  var rows=snapshotEntries().filter(function(e){return e.local_date===day&&(e.snapshot_version||0)>=4});
+  if(!rows.length)return null;
+  rows.sort(function(a,b){return Math.abs(minuteOfDay(a.local_time)-targetMinute)-Math.abs(minuteOfDay(b.local_time)-targetMinute)});
+  return Math.abs(minuteOfDay(rows[0].local_time)-targetMinute)<=60?rows[0]:null
+}
+function loadRepresentativeSessions(currentEntry){
+  var target=minuteOfDay(currentEntry.local_time),days=[];
+  snapshotEntries().forEach(function(e){if(e.local_date<currentEntry.local_date&&days.indexOf(e.local_date)<0)days.push(e.local_date)});
+  days.sort().reverse();days=days.slice(0,20);
+  var reps=days.map(function(d){return representativeAtClock(d,target)}).filter(Boolean);
+  if(!reps.length)return Promise.resolve([]);
+  return Promise.all(reps.map(function(e){return getJson(e.file).then(function(d){return{entry:e,data:d}}).catch(function(){return null})})).then(function(rows){return rows.filter(Boolean)})
+}
+function calculateVolumeAnomalies(current,baselines){
+  var out=[],currentProfiles=profileListForAnomaly(current);
+  currentProfiles.forEach(function(cp){
+    var expiry=cp.expiration;
+    (cp.strikes||[]).forEach(function(row){
+      [["Call","volume_call"],["Put","volume_put"]].forEach(function(side){
+        var currentVol=Number(row[side[1]]||0),hist=[];
+        baselines.forEach(function(b){
+          var bp=Array.isArray(b.data.expiry_profiles)?b.data.expiry_profiles.find(function(x){return x.expiration===expiry}):null;
+          if(!bp)return;var br=(bp.strikes||[]).find(function(x){return Number(x.k)===Number(row.k)});
+          if(br&&br[side[1]]!=null)hist.push(Number(br[side[1]])||0)
+        });
+        if(hist.length<3)return;
+        var st=robustStats(hist,currentVol);if(!st)return;
+        var anomaly=st.z>=3&&((st.median>0&&st.ratio>=1.5)||(st.median===0&&currentVol>=20));
+        out.push({expiry:expiry,k:row.k,side:side[0],current:currentVol,baseline_n:hist.length,median:st.median,mad:st.mad,z:st.z,ratio:st.ratio,anomaly:anomaly})
+      })
+    })
+  });
+  out.sort(function(a,b){return b.z-a.z});return out
+}
+function renderVolumeAnomalyResult(currentEntry,baselines){
+  var badge=$("volumeBaselineBadge"),sum=$("volumeAnomalySummary"),tbody=document.querySelector("#volumeAnomalyTable tbody"),note=$("volumeAnomalyNote");
+  sum.innerHTML="";tbody.innerHTML="";
+  if(baselines.length<3){
+    badge.textContent=baselines.length+" sessão(ões) comparáveis";
+    sum.innerHTML='<div class="volume-anomaly-empty"><strong>Baseline ainda insuficiente</strong><span>São necessárias pelo menos 3 sessões anteriores no mesmo horário aproximado.</span></div>';
+    note.textContent="O projeto ainda está formando o histórico necessário. O sistema não usa snapshots do mesmo dia como substituto, porque volume é cumulativo intradiário.";
+    return
+  }
+  var rows=calculateVolumeAnomalies(state.gex,baselines),flagged=rows.filter(function(r){return r.anomaly}),eligible=rows.length;
+  badge.textContent=baselines.length+" sessões no baseline";
+  [["Contratos lógicos",eligible,"expiry + strike + lado"],["Anomalias",flagged.length,"robust z ≥ 3 + filtro de magnitude"],["Maior z",rows.length?fmt2.format(rows[0].z):"—","atividade vs baseline"]].forEach(function(m){var d=document.createElement("div");d.className="volume-anomaly-kpi";d.innerHTML="<span></span><strong></strong><small></small>";d.children[0].textContent=m[0];d.children[1].textContent=m[1];d.children[2].textContent=m[2];sum.appendChild(d)});
+  var shown=(flagged.length?flagged:rows.slice(0,10)).slice(0,15);
+  shown.forEach(function(r,i){var tr=document.createElement("tr");[i+1,new Date(r.expiry+"T12:00:00").toLocaleDateString("pt-BR"),fmt2.format(r.k),r.side,fmt0.format(r.current),fmt0.format(r.median),fmt2.format(r.z),isFinite(r.ratio)?fmt2.format(r.ratio)+"×":"∞"].forEach(function(v,j){var td=document.createElement("td");if(j>=4)td.className="num";td.textContent=v;if(r.anomaly)tr.classList.add("anomaly-row");tr.appendChild(td)});tbody.appendChild(tr)});
+  note.textContent=(flagged.length?"Tabela prioriza os contratos sinalizados como anômalos. ":"Nenhum contrato ultrapassou o limiar; a tabela mostra os maiores robust z observados. ")+"O baseline usa sessões anteriores, mesmo expiry/strike/lado e coleta até ±60 minutos do horário atual.";
+}
+function renderVolumeAnomaly(){
+  var current=currentSnapshotEntry(),badge=$("volumeBaselineBadge"),sum=$("volumeAnomalySummary"),tbody=document.querySelector("#volumeAnomalyTable tbody"),note=$("volumeAnomalyNote");
+  if(!current){badge.textContent="sem snapshot";sum.innerHTML="";tbody.innerHTML="";note.textContent="Selecione um snapshot histórico catalogado.";return}
+  var key=current.generated_at+"|"+state.expiryFilter;
+  if(state.volumeBaselineCache[key]){renderVolumeAnomalyResult(current,state.volumeBaselineCache[key]);return}
+  badge.textContent="Carregando baseline…";sum.innerHTML="";tbody.innerHTML="";
+  loadRepresentativeSessions(current).then(function(rows){state.volumeBaselineCache[key]=rows;renderVolumeAnomalyResult(current,rows)}).catch(function(err){badge.textContent="erro";note.textContent="Falha ao construir baseline: "+err.message})
+}
+
+/* ---------- Shared historical day loader ---------- */
+function loadAnalysisDay(day){
+  if(state.analysisDayCache[day])return Promise.resolve(state.analysisDayCache[day]);
+  var entries=snapshotEntries().filter(function(e){return e.local_date===day}).sort(function(a,b){return a.local_time.localeCompare(b.local_time)});
+  return Promise.all(entries.map(function(e){return getJson(e.file).then(function(d){return{entry:e,data:d}}).catch(function(){return null})})).then(function(rows){rows=rows.filter(Boolean);state.analysisDayCache[day]=rows;return rows})
+}
+
+/* ---------- B7 · Put / Call ratios ---------- */
+function ratioMetrics(d){
+  if(!d)return null;
+  var rows=d.strikes||[],callOi=0,putOi=0,callVol=0,putVol=0;
+  rows.forEach(function(r){callOi+=Number(r.oi_call||0);putOi+=Number(r.oi_put||0);callVol+=Number(r.volume_call||0);putVol+=Number(r.volume_put||0)});
+  if(d.call_oi!=null)callOi=Number(d.call_oi||0);
+  if(d.put_oi!=null)putOi=Number(d.put_oi||0);
+  if(d.call_volume!=null)callVol=Number(d.call_volume||0);
+  if(d.put_volume!=null)putVol=Number(d.put_volume||0);
+  return{call_oi:callOi,put_oi:putOi,oi_ratio:d.put_call_oi_ratio!=null?Number(d.put_call_oi_ratio):(callOi>0?putOi/callOi:null),call_volume:callVol,put_volume:putVol,volume_ratio:d.put_call_volume_ratio!=null?Number(d.put_call_volume_ratio):(callVol>0?putVol/callVol:null)}
+}
+function ratioTone(v){if(v==null)return"indisponível";if(v>=1.25)return"predomínio relativo de puts";if(v<=.8)return"predomínio relativo de calls";return"composição relativamente equilibrada"}
+function renderPutCallHistory(rows){
+  var host=$("putCallHistoryChart");host.innerHTML="";
+  var pts=[];rows.forEach(function(r){var p=analysisProfile(r.data),m=ratioMetrics(p);if(m&&m.oi_ratio!=null&&m.volume_ratio!=null)pts.push({entry:r.entry,oi:m.oi_ratio,vol:m.volume_ratio})});
+  if(pts.length<2){host.innerHTML='<p class="note heatmap-empty">Histórico insuficiente para a série intradiária.</p>';return}
+  var vals=[];pts.forEach(function(p){vals.push(p.oi,p.vol)});var ymin=Math.max(0,Math.min.apply(null,vals)*.88),ymax=Math.max.apply(null,vals)*1.12;if(ymax<=ymin)ymax=ymin+1;
+  var W=660,H=290,m={l:52,r:14,t:18,b:44},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Histórico Put Call Ratio"},host),x=function(i){return m.l+i/Math.max(1,pts.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v-ymin)/(ymax-ymin))*(H-m.t-m.b)};
+  niceTicks(ymin,ymax,5).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:"grid"},svg);svgText(svg,m.l-6,y(t)+4,fmt2.format(t),{"text-anchor":"end"})});
+  svgEl("line",{x1:m.l,x2:W-m.r,y1:y(1),y2:y(1),stroke:cssVar("--axis"),"stroke-dasharray":"4 4"},svg);
+  function line(field,color){svgEl("path",{d:pts.map(function(p,i){return(i?"L":"M")+x(i).toFixed(1)+" "+y(p[field]).toFixed(1)}).join(" "),fill:"none",stroke:color,"stroke-width":2},svg)}
+  line("oi",cssVar("--purple"));line("vol",cssVar("--cyan"));
+  var every=Math.max(1,Math.ceil(pts.length/8));pts.forEach(function(p,i){if(i%every===0||i===pts.length-1)svgText(svg,x(i),H-m.b+16,p.entry.local_time.slice(0,5),{"text-anchor":"middle"})})
+}
+function renderPutCall(){
+  var d=activeGex(),m=ratioMetrics(d),box=$("putCallKpis"),badge=$("putCallScopeBadge"),expHost=$("putCallExpiryChart"),note=$("putCallNote");
+  if(!box||!expHost)return;box.innerHTML="";expHost.innerHTML="";
+  badge.textContent=state.expiryFilter==="all"?"Todos os vencimentos":new Date(state.expiryFilter+"T12:00:00").toLocaleDateString("pt-BR");
+  if(!m){box.innerHTML='<p class="note">Dados insuficientes.</p>';return}
+  [["P/C OI",m.oi_ratio==null?"—":fmt2.format(m.oi_ratio),ratioTone(m.oi_ratio)],["P/C Volume",m.volume_ratio==null?"—":fmt2.format(m.volume_ratio),ratioTone(m.volume_ratio)],["OI Calls / Puts",fmt0.format(m.call_oi)+" / "+fmt0.format(m.put_oi),"posições abertas"],["Volume Calls / Puts",fmt0.format(m.call_volume)+" / "+fmt0.format(m.put_volume),"volume acumulado"]].forEach(function(k){var el=document.createElement("div");el.className="putcall-kpi";el.innerHTML="<span></span><strong></strong><small></small>";el.children[0].textContent=k[0];el.children[1].textContent=k[1];el.children[2].textContent=k[2];box.appendChild(el)});
+
+  var profiles=(state.gex.expiry_profiles||[]).map(function(p){return{p:p,m:ratioMetrics(p)}}).filter(function(x){return x.m&&x.m.oi_ratio!=null&&x.m.volume_ratio!=null}).sort(function(a,b){return(a.p.dte||0)-(b.p.dte||0)});
+  if(profiles.length){
+    var W=660,H=290,mm={l:52,r:14,t:18,b:58},vals=[];profiles.forEach(function(x){vals.push(x.m.oi_ratio,x.m.volume_ratio)});var ymin=Math.max(0,Math.min.apply(null,vals)*.88),ymax=Math.max.apply(null,vals)*1.12;if(ymax<=ymin)ymax=ymin+1;
+    var svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Put Call Ratio por vencimento"},expHost),x=function(i){return mm.l+i/Math.max(1,profiles.length-1)*(W-mm.l-mm.r)},y=function(v){return mm.t+(1-(v-ymin)/(ymax-ymin))*(H-mm.t-mm.b)};
+    niceTicks(ymin,ymax,5).forEach(function(t){svgEl("line",{x1:mm.l,x2:W-mm.r,y1:y(t),y2:y(t),class:"grid"},svg);svgText(svg,mm.l-6,y(t)+4,fmt2.format(t),{"text-anchor":"end"})});svgEl("line",{x1:mm.l,x2:W-mm.r,y1:y(1),y2:y(1),stroke:cssVar("--axis"),"stroke-dasharray":"4 4"},svg);
+    function line(field,color){svgEl("path",{d:profiles.map(function(p,i){return(i?"L":"M")+x(i).toFixed(1)+" "+y(p.m[field]).toFixed(1)}).join(" "),fill:"none",stroke:color,"stroke-width":2},svg)}
+    line("oi_ratio",cssVar("--purple"));line("volume_ratio",cssVar("--cyan"));
+    profiles.forEach(function(p,i){var label=p.p.dte+"d",tx=x(i),t=svgText(svg,tx,H-mm.b+18,label,{"text-anchor":"end"});t.setAttribute("transform","rotate(-45 "+tx+" "+(H-mm.b+18)+")")})
+  }
+  legend("putCallExpiryLegend",[{name:"P/C OI",color:cssVar("--purple")},{name:"P/C Volume",color:cssVar("--cyan")}]);legend("putCallHistoryLegend",[{name:"P/C OI",color:cssVar("--purple")},{name:"P/C Volume",color:cssVar("--cyan")},{name:"Equilíbrio = 1",color:cssVar("--axis"),dash:true}]);
+  var cur=currentSnapshotEntry(),day=cur&&cur.local_date;if(day)loadAnalysisDay(day).then(renderPutCallHistory);
+  note.textContent="Razão > 1 significa mais puts que calls na métrica escolhida; < 1, mais calls. Volume é cumulativo intradiário; OI representa posições abertas e normalmente muda entre sessões."
+}
+
+/* ---------- C3 · Optional Kalman smoothing ---------- */
+function kalmanSeries(values,speed){
+  if(!values.length)return[];var mean=values.reduce(function(a,b){return a+b},0)/values.length,variance=values.reduce(function(a,b){return a+(b-mean)*(b-mean)},0)/Math.max(1,values.length-1);variance=Math.max(1,variance);
+  var qFactor=speed==="slow"?.002:speed==="fast"?.15:.025,R=variance,Q=variance*qFactor,x=values[0],P=variance,out=[x];
+  for(var i=1;i<values.length;i++){P+=Q;var K=P/(P+R);x=x+K*(values[i]-x);P=(1-K)*P;out.push(x)}
+  return out
+}
+function renderSmoothingSeries(rows){
+  var host=$("gexSmoothingChart"),status=$("smoothingStatus");host.innerHTML="";
+  var pts=[];rows.forEach(function(r){var p=analysisProfile(r.data);if(p&&p.net_gex!=null)pts.push({entry:r.entry,v:Number(p.net_gex)})});
+  if(pts.length<2){host.innerHTML='<p class="note heatmap-empty">São necessários pelo menos dois snapshots compatíveis.</p>';status.textContent="Histórico insuficiente.";return}
+  var raw=pts.map(function(p){return p.v}),smooth=kalmanSeries(raw,state.smoothSpeed),vals=raw.slice();if(state.smoothEnabled)vals=vals.concat(smooth);
+  var ymin=Math.min.apply(null,vals),ymax=Math.max.apply(null,vals),pad=(ymax-ymin)*.1||Math.max(1,Math.abs(ymax)*.05);ymin-=pad;ymax+=pad;
+  var W=1220,H=310,m={l:78,r:18,t:22,b:46},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Net GEX bruto e suavizado"},host),x=function(i){return m.l+i/Math.max(1,pts.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v-ymin)/(ymax-ymin))*(H-m.t-m.b)};
+  niceTicks(ymin,ymax,6).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:t===0?"axis":"grid"},svg);svgText(svg,m.l-8,y(t)+4,compact(t),{"text-anchor":"end"})});
+  svgEl("path",{d:raw.map(function(v,i){return(i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)}).join(" "),fill:"none",stroke:cssVar("--cyan"),"stroke-width":1.6},svg);
+  if(state.smoothEnabled)svgEl("path",{d:smooth.map(function(v,i){return(i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)}).join(" "),fill:"none",stroke:cssVar("--purple"),"stroke-width":2.5},svg);
+  var every=Math.max(1,Math.ceil(pts.length/9));pts.forEach(function(p,i){if(i%every===0||i===pts.length-1)svgText(svg,x(i),H-m.b+16,p.entry.local_time.slice(0,5),{"text-anchor":"middle"})});
+  var lastRaw=raw[raw.length-1],lastSmooth=smooth[smooth.length-1];status.textContent="Atual bruto: "+usd(lastRaw)+(state.smoothEnabled?" · Kalman: "+usd(lastSmooth)+" · diferença "+fmtPct.format(lastRaw?((lastSmooth/lastRaw)-1)*100:0)+"%":" · suavização desativada");
+}
+function renderSmoothing(){
+  $("gexSmoothToggle").checked=state.smoothEnabled;$("gexSmoothSpeed").value=state.smoothSpeed;$("gexSmoothSpeed").disabled=!state.smoothEnabled;
+  legend("smoothingLegend",state.smoothEnabled?[{name:"Net GEX bruto",color:cssVar("--cyan")},{name:"Kalman",color:cssVar("--purple")}]:[{name:"Net GEX bruto",color:cssVar("--cyan")}]);
+  var cur=currentSnapshotEntry(),day=cur&&cur.local_date;if(!day){$("gexSmoothingChart").innerHTML='<p class="note">Sem dia selecionado.</p>';return}
+  loadAnalysisDay(day).then(renderSmoothingSeries)
+}
+
+/* ---------- C4 · Deterministic plain-language context ---------- */
+function addContextItem(box,title,text,tag){
+  var d=document.createElement("div");d.className="context-item";var top=document.createElement("div");top.className="context-item-head";var s=document.createElement("strong");s.textContent=title;var b=document.createElement("span");b.className="context-tag";b.textContent=tag||"Contexto";top.appendChild(s);top.appendChild(b);var p=document.createElement("p");p.textContent=text;d.appendChild(top);d.appendChild(p);box.appendChild(d)
+}
+function contextOpeningProfile(rows){
+  var opening=rows.find(function(r){return r.entry.is_win_open_reference});if(!opening)return null;
+  return analysisProfile(opening.data)
+}
+function renderAutoContextWithDay(rows){
+  var box=$("autoContextList"),note=$("autoContextNote"),badge=$("contextScopeBadge"),d=activeGex(),pc=ratioMetrics(d),p=structureProfile(),quality=state.gex.quality||{},opening=contextOpeningProfile(rows||[]);
+  box.innerHTML="";badge.textContent=state.expiryFilter==="all"?"Cadeia agregada":"Expiry "+new Date(state.expiryFilter+"T12:00:00").toLocaleDateString("pt-BR");
+
+  if(d.flip!=null){
+    var distFlip=(d.spot/d.flip-1)*100;addContextItem(box,"Regime de gamma","O EWZ está "+(distFlip>=0?"acima":"abaixo")+" do Gamma Flip em "+fmt2.format(Math.abs(distFlip))+"%. No modelo atual isso corresponde a "+(d.spot>=d.flip?"regime de gamma positivo, associado a maior potencial de amortecimento de movimentos.":"regime de gamma negativo, associado a maior potencial de amplificação de movimentos.") ,"Estrutura")
+  }else addContextItem(box,"Regime de gamma","Não há cruzamento de Gamma Flip dentro da faixa calculada. O Net GEX atual é "+(d.net_gex>=0?"positivo":"negativo")+".","Estrutura");
+
+  var dc=(d.call_wall/d.spot-1)*100,dp=(d.put_wall/d.spot-1)*100,near=Math.abs(dc)<=Math.abs(dp)?"Call Wall":"Put Wall",nearDist=Math.min(Math.abs(dc),Math.abs(dp));
+  addContextItem(box,"Walls","A Call Wall está "+fmt2.format(Math.abs(dc))+"% "+(dc>=0?"acima":"abaixo")+" do spot e a Put Wall "+fmt2.format(Math.abs(dp))+"% "+(dp>=0?"acima":"abaixo")+". A região mais próxima é a "+near+" ("+fmt2.format(nearDist)+"%).","Níveis");
+
+  if(pc&&pc.oi_ratio!=null)addContextItem(box,"Composição Put/Call","O P/C por OI está em "+fmt2.format(pc.oi_ratio)+" e o P/C por volume em "+(pc.volume_ratio==null?"—":fmt2.format(pc.volume_ratio))+". Isso indica "+ratioTone(pc.oi_ratio)+" no estoque de posições; volume e OI devem ser interpretados separadamente.","Opções");
+
+  var ivp=ivReferenceProfile(),ts=derivedTermStructure();
+  if(ivp)addContextItem(box,"Volatilidade implícita","A IV ATM do vencimento de referência está em "+fmt2.format(ivp.atm_iv_pct)+"%. O RR25 é "+(ivp.rr25_vol_points==null?"indisponível":fmt2.format(ivp.rr25_vol_points)+" vol pts")+" e a term structure está classificada como "+(ts.regime||"insuficiente")+".","IV");
+
+  if(p){var pins=derivedPinning(p);if(pins.length)addContextItem(box,"Gamma Gravity","O maior score de pinning está no strike "+fmt2.format(pins[0].k)+", a "+fmt2.format(pins[0].distance_pct)+"% do spot. O score é relativo ao expiry e não representa probabilidade de fechamento.","Pinning")}
+
+  if(opening&&opening.net_gex!=null){
+    var delta=d.net_gex-opening.net_gex,pct=opening.net_gex?delta/Math.abs(opening.net_gex)*100:null;
+    var wallTxt="";if(opening.call_wall!=null&&opening.put_wall!=null)wallTxt=" A Call Wall mudou de "+fmt2.format(opening.call_wall)+" para "+fmt2.format(d.call_wall)+" e a Put Wall de "+fmt2.format(opening.put_wall)+" para "+fmt2.format(d.put_wall)+".";
+    addContextItem(box,"Desde a abertura","Desde o snapshot ★ da abertura, o Net GEX "+(delta>=0?"aumentou":"diminuiu")+" em "+usd(Math.abs(delta))+(pct==null?"":" ("+fmt2.format(Math.abs(pct))+"% em relação à magnitude inicial)")+"."+wallTxt,"Histórico")
+  }
+
+  addContextItem(box,"Qualidade dos dados","O snapshot está classificado como "+(quality.status==="ok"?"OK":quality.status==="warning"?"Atenção":quality.status==="critical"?"Crítico":"sem classificação")+". A fonte de opções é pública e delayed; freshness técnico não equivale a feed real-time.","Qualidade");
+  note.textContent="Este texto é gerado por regras determinísticas a partir das métricas exibidas. Ele descreve contexto estrutural e não recomenda compra, venda ou direção futura."
+}
+function renderAutoContext(){
+  var cur=currentSnapshotEntry(),day=cur&&cur.local_date;if(!day){renderAutoContextWithDay([]);return}
+  loadAnalysisDay(day).then(renderAutoContextWithDay).catch(function(){renderAutoContextWithDay([])})
+}
+
 function gammaZones(mapper){
   var d=activeGex(),rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
   for(var i=1;i<rows.length;i++)gap=Math.min(gap,rows[i].k-rows[i-1].k);if(!isFinite(gap))gap=.5;
@@ -939,16 +1142,18 @@ function priceChart(id,key,mapper,legendId){
   legend(legendId,legendItems);viewStatus(key,all.length)
 }
 function renderPrices(){renderPrice("ewz");renderPrice("win")}
-function renderAll(){renderHeader();renderQuality();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();renderOiControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderScorecard();renderReceipts();renderPrices()}
+function renderAll(){renderHeader();renderQuality();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();renderOiControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderScorecard();renderReceipts();renderVolumeAnomaly();renderPutCall();renderSmoothing();renderAutoContext();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
-  var savedMode=store("gex.viewMode"),savedCount=parseInt(store("gex.zoneCount"),10),savedOpacity=store("gex.zoneOpacity");
+  var savedMode=store("gex.viewMode"),savedCount=parseInt(store("gex.zoneCount"),10),savedOpacity=store("gex.zoneOpacity"),savedSmooth=store("gex.smoothEnabled"),savedSmoothSpeed=store("gex.smoothSpeed");
   if(["levels","intensity","both"].indexOf(savedMode)>=0)state.viewMode=savedMode;
   if([3,5,7,10].indexOf(savedCount)>=0)state.zoneCount=savedCount;
   if(["low","medium","high"].indexOf(savedOpacity)>=0)state.zoneOpacity=savedOpacity;
+  state.smoothEnabled=savedSmooth==="1";
+  if(["slow","medium","fast"].indexOf(savedSmoothSpeed)>=0)state.smoothSpeed=savedSmoothSpeed;
   $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison();renderAdvanced();var d=$("timeMapDateSelect").value;if(d&&state.timeMapCache[d])renderTimeMap(d)});
-  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;state.stressScenario=null;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d);var od=$("oiDateSelect").value;if(od)loadOiDelta(od)});
+  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;state.stressScenario=null;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderIV();renderStress();renderPinning();renderVolumeAnomaly();renderPutCall();renderSmoothing();renderAutoContext();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d);var od=$("oiDateSelect").value;if(od)loadOiDelta(od)});
   $("timeMapDateSelect").addEventListener("change",function(e){loadTimeMapDay(e.target.value)});
   $("oiDateSelect").addEventListener("change",function(e){loadOiDelta(e.target.value)});
   $("advancedMetricSelect").addEventListener("change",function(e){state.advancedMetric=e.target.value;renderAdvanced()});
@@ -958,6 +1163,8 @@ function init(){
   $("saveReceiptBtn").addEventListener("click",saveStressReceipt);
   $("exportReceiptsBtn").addEventListener("click",function(){downloadJson("gex-analysis-receipts.json",{version:1,exported_at:new Date().toISOString(),receipts:state.receipts})});
   $("scorecardHorizon").addEventListener("change",renderScorecard);
+  $("gexSmoothToggle").addEventListener("change",function(e){state.smoothEnabled=e.target.checked;store("gex.smoothEnabled",state.smoothEnabled?"1":"0");renderSmoothing()});
+  $("gexSmoothSpeed").addEventListener("change",function(e){state.smoothSpeed=e.target.value;store("gex.smoothSpeed",state.smoothSpeed);renderSmoothing()});
   $("compareBtn").addEventListener("click",loadCompare);
   $("compareSwapBtn").addEventListener("click",function(){var a=$("compareASelect").value,b=$("compareBSelect").value;$("compareASelect").value=b;$("compareBSelect").value=a;loadCompare()});
   document.querySelectorAll(".chart-tool").forEach(function(btn){btn.addEventListener("click",function(){adjustChartView(btn.getAttribute("data-chart"),btn.getAttribute("data-action"))})});

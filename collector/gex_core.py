@@ -62,7 +62,7 @@ def bs_gamma(spot, strike, t, iv, r=0.0):
     return norm_pdf(d1) / (spot * iv * math.sqrt(t))
 
 
-def parse_chain(data, today=None, max_dte=None):
+def parse_chain(data, today=None, max_dte=None, include_zero_oi=False):
     """Extrai (spot, contratos) do campo 'data' da resposta original do CBOE."""
     today = today or date.today()
     spot = float(data["current_price"])
@@ -76,7 +76,7 @@ def parse_chain(data, today=None, max_dte=None):
         if dte < 0 or (max_dte is not None and dte > max_dte):
             continue
         oi = float(o.get("open_interest") or 0)
-        if oi <= 0:
+        if oi <= 0 and not include_zero_oi:
             continue
         out.append(dict(cp=m["cp"], strike=int(m["k"]) / 1000.0, dte=dte,
                         expiration=exp.isoformat(),
@@ -277,6 +277,39 @@ def side_metrics_by_strike(contracts):
     return out
 
 
+def merge_activity_metrics(result, activity_contracts):
+    """Overlay volume/activity metrics from the full valid chain.
+
+    GEX calculations can keep using OI>0 contracts while volume analyses also
+    include contracts whose prior-session OI is zero.
+    """
+    side = side_metrics_by_strike(activity_contracts)
+    by_row = {float(r["k"]): r for r in result.get("strikes", [])}
+    for strike, sm in side.items():
+        row = by_row.get(float(strike))
+        if row is None:
+            row = {
+                "k": strike, "call": 0, "put": 0, "net": 0,
+                "dex": 0, "vanna": 0, "charm": 0,
+                "oi_call": 0, "oi_put": 0,
+                "iv_call": sm.get("iv_call"), "iv_put": sm.get("iv_put"),
+                "delta_call": sm.get("delta_call"), "delta_put": sm.get("delta_put"),
+            }
+            result.setdefault("strikes", []).append(row)
+            by_row[float(strike)] = row
+        row["volume_call"] = sm.get("volume_call", 0)
+        row["volume_put"] = sm.get("volume_put", 0)
+        if row.get("oi_call") is None:
+            row["oi_call"] = sm.get("oi_call", 0)
+        if row.get("oi_put") is None:
+            row["oi_put"] = sm.get("oi_put", 0)
+
+    result["strikes"] = sorted(result.get("strikes", []), key=lambda r: r["k"])
+    result.update(put_call_metrics(activity_contracts))
+    result["n_activity_contracts"] = len(activity_contracts)
+    return result
+
+
 def iv_skew_metrics(spot, contracts):
     """ATM IV, 25-delta risk reversal and butterfly for one expiry."""
     valid = [c for c in contracts if c.get("iv", 0) and c.get("iv", 0) > 0]
@@ -400,6 +433,22 @@ def oi_delta_by_strike(previous_strikes, current_strikes):
     return out
 
 
+def put_call_metrics(contracts):
+    """Aggregate put/call ratios for OI and cumulative volume."""
+    call_oi = sum(float(c.get("oi", 0) or 0) for c in contracts if c.get("cp") == "C")
+    put_oi = sum(float(c.get("oi", 0) or 0) for c in contracts if c.get("cp") == "P")
+    call_volume = sum(float(c.get("volume", 0) or 0) for c in contracts if c.get("cp") == "C")
+    put_volume = sum(float(c.get("volume", 0) or 0) for c in contracts if c.get("cp") == "P")
+    return {
+        "call_oi": round(call_oi),
+        "put_oi": round(put_oi),
+        "put_call_oi_ratio": round(put_oi / call_oi, 4) if call_oi > 0 else None,
+        "call_volume": round(call_volume),
+        "put_volume": round(put_volume),
+        "put_call_volume_ratio": round(put_volume / call_volume, 4) if call_volume > 0 else None,
+    }
+
+
 def pinning_scores(spot, contracts):
     """Heuristic Gamma Gravity ranking for one expiry.
 
@@ -479,6 +528,7 @@ def compute(spot, contracts):
         "curve": [{"s": round(s, 4), "gex": round(g)} for s, g in curve],
         "n_contracts": len(contracts),
         **{k: round(v) for k, v in adv_totals.items()},
+        **put_call_metrics(contracts),
     }
 
     if len(expirations) == 1:
@@ -511,25 +561,26 @@ def compute(spot, contracts):
     return result
 
 
-def compute_expiry_profiles(spot, contracts):
-    """Calcula o mesmo mapa de GEX separadamente para cada vencimento.
-
-    Os perfis sao armazenados no snapshot para permitir heatmap strike x expiry
-    e filtros por vencimento no dashboard. A curva completa de 161 pontos nao e
-    repetida por expiry para manter os arquivos menores.
-    """
+def compute_expiry_profiles(spot, contracts, activity_contracts=None):
+    """Calcula o mapa de GEX por vencimento e preserva atividade da chain completa."""
     groups = {}
     for contract in contracts:
         expiry = contract.get("expiration") or f"DTE-{contract.get('dte', 0)}"
         groups.setdefault(expiry, []).append(contract)
 
+    activity_groups = {}
+    for contract in (activity_contracts or contracts):
+        expiry = contract.get("expiration") or f"DTE-{contract.get('dte', 0)}"
+        activity_groups.setdefault(expiry, []).append(contract)
+
     profiles = []
     for expiry, rows in sorted(groups.items()):
         profile = compute(spot, rows)
+        merge_activity_metrics(profile, activity_groups.get(expiry, rows))
         profile.pop("curve", None)
         profile["expiration"] = expiry
         profile["dte"] = min((r.get("dte", 0) for r in rows), default=0)
-        profile["volume"] = round(sum(r.get("volume", 0) for r in rows))
+        profile["volume"] = round(sum(r.get("volume", 0) for r in activity_groups.get(expiry, rows)))
         profile["open_interest"] = round(sum(r.get("oi", 0) for r in rows))
         profiles.append(profile)
     return profiles

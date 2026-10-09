@@ -40,99 +40,98 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 - slope em vol points/30 dias.
 
 ### B3 — Stress Lab / Market Wind Tunnel
-**Status:** implementado.
-
 - choques configuráveis de spot, IV e passagem do tempo;
 - recálculo aproximado de GEX, Walls, Flip, DEX, Vanna e Charm;
-- comparação base × cenário;
-- gráfico dos perfis de GEX;
-- usa o snapshot/expiry ativos;
-- deixa explícito que OI permanece fixo e que o modelo usa agregados por strike.
+- recibo reproduzível.
 
 ### B4 — Pinning / Gamma Gravity
-**Status:** implementado.
-
 - ranking Top 10 por expiry;
-- score combina concentração absoluta de gamma, OI, proximidade do spot e tempo até vencimento;
-- score normalizado 0–100;
-- projeção dos strikes para WIN;
-- tratado explicitamente como heurística estrutural, não probabilidade de fechamento.
+- score combina gamma, OI, proximidade e DTE;
+- tratado como heurística, não previsão.
 
 ### B5 — ΔOI entre sessões
 - OI call/put por strike e expiry;
-- comparação apenas entre sessões/dias;
+- comparação somente entre sessões/dias;
 - ΔOI calls, puts e líquido.
 
-### C1 — Scorecard de validação histórica
+### B6 — Volume anômalo por contrato lógico
 **Status:** implementado.
 
-- avalia Call Wall e Put Wall em snapshots históricos;
-- mede toque, rejeição, rompimento e tempo até interação;
-- calcula métricas separadas para EWZ e níveis projetados no WIN;
-- horizontes configuráveis de 60, 120 e 240 minutos;
-- exclui snapshots sem toda a janela futura disponível;
-- rejeição/rompimento usam regra explícita de 0,15% após o toque;
-- amostra cresce automaticamente com o histórico.
+- contrato lógico = expiry + strike + lado call/put;
+- compara volume cumulativo com sessões anteriores em horário semelhante;
+- baseline usa até 20 sessões anteriores e exige no mínimo 3 compatíveis;
+- janela de horário comparável de ±60 minutos;
+- robust z baseado em mediana e MAD;
+- sinalização exige robust z ≥ 3 e filtro adicional de magnitude;
+- não usa snapshots do mesmo dia como baseline;
+- volume considera toda a chain válida, inclusive contratos com OI = 0;
+- enquanto o histórico ainda não possui 3 sessões, o painel informa baseline insuficiente em vez de criar falso sinal.
+
+### B7 — Put / Call Ratios
+**Status:** implementado.
+
+- P/C por open interest;
+- P/C por volume;
+- visão agregada e por expiry;
+- histórico intradiário;
+- linha de referência em 1;
+- volume considera toda a chain válida, inclusive contratos com OI = 0;
+- OI e volume permanecem conceitualmente separados.
+
+### C1 — Scorecard de validação histórica
+- toque, rejeição, rompimento e tempo até interação;
+- EWZ e projeção para WIN;
+- janelas de 60, 120 e 240 minutos;
+- sem look-ahead.
 
 ### C2 — Painel de qualidade / freshness
 - idade técnica, cobertura da chain e flags;
 - estado de candles EWZ/WIN;
 - distinção entre freshness técnico e feed delayed.
 
-### D2 — Replay reproduzível / recibo de análise
+### C3 — GEX suavizado opcional
 **Status:** implementado.
 
-- recibo do Stress Lab com snapshot, versão, expiry, parâmetros, base e resultado;
-- persistência local no navegador;
-- replay de um cenário salvo;
-- exportação individual ou consolidada em JSON;
-- limite local de 50 recibos.
+- série temporal de Net GEX bruto sempre visível;
+- filtro de Kalman opcional;
+- responsividade lenta, média ou rápida;
+- funciona com a visão agregada ou expiry selecionado quando o snapshot possui esse detalhe;
+- suavização é somente visual e não altera KPIs, Walls, Flip ou dados originais.
+
+### C4 — Contexto automático em linguagem simples
+**Status:** implementado.
+
+- texto determinístico sobre regime de gamma;
+- distâncias para Call/Put Wall;
+- Put/Call Ratios;
+- IV, RR25 e term structure;
+- Gamma Gravity;
+- mudança desde o snapshot da abertura;
+- qualidade dos dados;
+- nenhuma linguagem de certeza, sinal ou recomendação.
+
+### D2 — Replay reproduzível / recibo de análise
+- snapshot, versão, expiry, parâmetros e resultados;
+- replay e exportação JSON.
 
 ### Educação contextual — ícones de informação
-**Status:** implementado.
-
-- cada seção do dashboard possui ícone `i`;
-- pop-up padronizada com “o que mostra”, “como interpretar” e “cuidados/limitações”;
-- suporte a teclado/Esc e clique fora;
-- link para o guia didático completo;
-- arquitetura reutilizável em `docs/help.js` para futuras seções.
+- todas as principais seções possuem ajuda contextual;
+- pop-up com o que mostra, como interpretar e limitações;
+- catálogo reutilizável em `docs/help.js`.
 
 ---
 
 # Próximos blocos — dados gratuitos
 
-## B6 — Volume anômalo por contrato
-**Prioridade:** média.
-
-Baseline histórico por contrato/strike/expiry e destaque de atividade acima da própria linha de base.
-
-## B7 — Put/Call Ratios
-**Prioridade:** média.
-
-- Put/Call por OI;
-- Put/Call por volume;
-- por expiry e agregado;
-- histórico.
-
-## C3 — GEX suavizado opcional
-**Prioridade:** média.
-
-Filtro de Kalman ou equivalente para a série histórica, sempre mantendo o valor bruto visível.
-
-## C4 — Contexto automático em linguagem simples
-**Prioridade:** média.
-
-Resumo determinístico de distância a Walls, posição relativa ao Flip e mudanças desde a abertura, sem linguagem de certeza.
-
 ## C5 — Indicadores de preço como confluência opcional
 **Prioridade:** média/baixa.
 
-ATR, RSI e Bollinger opcionais, sem misturá-los ao cálculo de GEX.
+Adicionar ATR, RSI e Bollinger como camadas opcionais, sem incorporá-los ao cálculo de GEX.
 
 ## D1 — Comparação OI-weighted × Volume-weighted
 **Prioridade:** média.
 
-Manter dois modelos separados:
+Manter modelos explicitamente separados:
 - OI = inventário/posições abertas;
 - volume = atividade intradiária.
 
@@ -153,15 +152,8 @@ Mantém separados:
 # Sequência sugerida
 
 ### Próximo bloco recomendado
-**B6 + B7 + C3 + C4**
-- volume anômalo;
-- Put/Call ratios;
-- GEX suavizado;
-- contexto automático.
-
-### Depois
 **C5 + D1**
 - indicadores de preço opcionais;
-- OI-weighted × Volume-weighted.
+- comparação OI-weighted × Volume-weighted.
 
 O roadmap deve ser revisado sempre que uma funcionalidade for integrada, movendo-a para “Concluído”.

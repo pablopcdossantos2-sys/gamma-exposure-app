@@ -123,6 +123,30 @@ var TOPICS={
     interpret:"Gamma positivo tende a ser associado a hedge amortecedor; gamma negativo pode favorecer amplificação. Walls são concentrações, não barreiras.",
     caution:"Esses efeitos são probabilísticos e dependem da hipótese de posicionamento dealer e de outras forças de mercado."
   },
+  "volume-anomaly":{
+    title:"Volume anômalo por contrato lógico",
+    what:"Compara o volume acumulado atual de cada expiry + strike + lado (call/put) com sessões anteriores no mesmo horário aproximado.",
+    interpret:"Robust z alto significa que o volume atual está muito acima da distribuição histórica daquele contrato lógico. A tabela prioriza casos com robust z ≥ 3 e magnitude material.",
+    caution:"Volume é cumulativo durante o dia. Por isso o sistema só compara sessões diferentes e horários semelhantes. Com menos de três sessões anteriores compatíveis, nenhuma anomalia é declarada."
+  },
+  "put-call":{
+    title:"Put / Call Ratios",
+    what:"Mostra a razão puts/calls por open interest e por volume, tanto agregada quanto por vencimento e ao longo do dia.",
+    interpret:"Valor acima de 1 significa mais puts que calls na métrica escolhida; abaixo de 1, mais calls. OI descreve estoque de posições abertas; volume descreve atividade.",
+    caution:"Put/Call alto não significa automaticamente queda, e baixo não significa alta. Estrutura, vencimento, moneyness e motivo das operações importam."
+  },
+  "gex-smoothing":{
+    title:"Net GEX suavizado",
+    what:"Aplica um filtro de Kalman opcional à série temporal de Net GEX, mantendo a linha bruta sempre visível.",
+    interpret:"A linha suavizada ajuda a enxergar tendência e reduzir ruído entre snapshots. Responsividade lenta filtra mais; rápida acompanha mais de perto o valor bruto.",
+    caution:"O filtro é apenas visual. Ele não altera GEX, Walls, Flip ou outros cálculos e pode atrasar mudanças reais quando a suavização é forte."
+  },
+  "auto-context":{
+    title:"Contexto automático",
+    what:"Transforma métricas já calculadas em frases simples sobre regime, distância às Walls, Put/Call, IV, pinning, mudanças desde a abertura e qualidade dos dados.",
+    interpret:"Use como roteiro de leitura para entender o que merece atenção antes de examinar os gráficos em detalhe.",
+    caution:"O texto é determinístico, não uma previsão de IA. Ele descreve o estado atual e não recomenda compra, venda ou direção futura."
+  },
   "guide-delta":{
     title:"Delta",
     what:"Delta mede a sensibilidade do preço da opção a uma pequena variação do ativo e funciona também como aproximação de exposição direcional.",

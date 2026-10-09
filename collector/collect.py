@@ -174,7 +174,7 @@ def archive_snapshot(latest, outdir, now):
 
     snap = dict(latest)
     snap.pop("curve", None)
-    snap["snapshot_version"] = 5
+    snap["snapshot_version"] = 6
     snap["snapshot_timezone"] = "America/Sao_Paulo"
 
     rel_file = f"data/gex-snapshots/{day}/{hhmmss}.json"
@@ -205,7 +205,7 @@ def archive_snapshot(latest, outdir, now):
         "cboe_timestamp": latest.get("cboe_timestamp"),
         "distance_to_win_open_minutes": round(abs(minute - WIN_OPEN_MINUTE), 2),
         "is_win_open_reference": False,
-        "snapshot_version": latest.get("snapshot_version", 5),
+        "snapshot_version": latest.get("snapshot_version", 6),
         "quality_status": (latest.get("quality") or {}).get("status"),
         "source_age_seconds": (latest.get("quality") or {}).get("source_age_seconds"),
     })
@@ -248,10 +248,12 @@ def main():
             json.dump(raw, f)
 
     spot, contracts = gex_core.parse_chain(raw["data"], max_dte=a.max_dte)
+    _, activity_contracts = gex_core.parse_chain(raw["data"], max_dte=a.max_dte, include_zero_oi=True)
     if not contracts:
         raise RuntimeError("Chain vazia apos filtros.")
     res = gex_core.compute(spot, contracts)
-    expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts)
+    gex_core.merge_activity_metrics(res, activity_contracts)
+    expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts, activity_contracts=activity_contracts)
     term_structure = gex_core.compute_term_structure(expiry_profiles)
     source_timestamp = raw["data"].get("timestamp") or raw.get("timestamp")
     quality = assess_quality(raw["data"], contracts, now, source_timestamp=source_timestamp)
@@ -263,7 +265,7 @@ def main():
         "cboe_timestamp": raw["data"].get("timestamp") or raw.get("timestamp"),
         "max_dte": a.max_dte,
         "raw_file": raw_file,
-        "snapshot_version": 5,
+        "snapshot_version": 6,
         "expiry_profiles": expiry_profiles,
         "term_structure": term_structure,
         "quality": quality,
