@@ -81,10 +81,10 @@ def _parse_source_timestamp(value):
     return None
 
 
-def assess_quality(raw_data, contracts, now):
+def assess_quality(raw_data, contracts, now, source_timestamp=None):
     """Technical data-quality metadata; does not claim the public feed is realtime."""
     options = raw_data.get("options", []) if isinstance(raw_data, dict) else []
-    source_value = raw_data.get("timestamp") if isinstance(raw_data, dict) else None
+    source_value = source_timestamp or (raw_data.get("timestamp") if isinstance(raw_data, dict) else None)
     source_dt = _parse_source_timestamp(source_value)
     age = max(0, int((now - source_dt.astimezone(timezone.utc)).total_seconds())) if source_dt else None
 
@@ -253,7 +253,8 @@ def main():
     res = gex_core.compute(spot, contracts)
     expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts)
     term_structure = gex_core.compute_term_structure(expiry_profiles)
-    quality = assess_quality(raw["data"], contracts, now)
+    source_timestamp = raw["data"].get("timestamp") or raw.get("timestamp")
+    quality = assess_quality(raw["data"], contracts, now, source_timestamp=source_timestamp)
 
     latest = {
         "symbol": symbol,
