@@ -50,6 +50,45 @@
     <div class="chart chart-gex" id="chartGex"></div>
   </section>
 
+  <section class="card display-config">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Visualização configurável</p>
+        <h2>Regiões de GEX nos gráficos de preço</h2>
+        <p class="note">As faixas graduadas por intensidade são opcionais. O padrão da ferramenta continua mostrando apenas os níveis principais.</p>
+      </div>
+      <button type="button" class="ghost" id="resetViewBtn">Restaurar padrão</button>
+    </div>
+    <div class="display-controls">
+      <label>
+        Modo de exibição
+        <select id="gexViewMode">
+          <option value="levels" selected>Somente níveis principais</option>
+          <option value="intensity">Faixas graduadas por intensidade</option>
+          <option value="both">Níveis + faixas de intensidade</option>
+        </select>
+      </label>
+      <label id="zoneCountWrap">
+        Faixas de maior |GEX|
+        <select id="zoneCountSel">
+          <option value="3">Top 3</option>
+          <option value="5">Top 5</option>
+          <option value="7" selected>Top 7</option>
+          <option value="10">Top 10</option>
+        </select>
+      </label>
+      <label id="zoneOpacityWrap">
+        Intensidade visual
+        <select id="zoneOpacitySel">
+          <option value="low">Suave</option>
+          <option value="medium" selected>Média</option>
+          <option value="high">Forte</option>
+        </select>
+      </label>
+    </div>
+    <p class="config-hint" id="gexViewHint">Níveis principais ativos; faixas de intensidade desativadas.</p>
+  </section>
+
   <section class="price-grid">
     <article class="card price-card">
       <div class="card-head">
