@@ -57,6 +57,20 @@ O dashboard também inclui:
 
 A partir do snapshot v4, cada strike também preserva OI, volume, IV e delta separados entre calls e puts para sustentar essas análises históricas.
 
+## Stress Lab, Gamma Gravity, scorecard e educação contextual
+
+O dashboard também inclui:
+
+- **Stress Lab / Market Wind Tunnel:** choques configuráveis de spot, IV e passagem do tempo, com recálculo aproximado de GEX, Walls, Flip, DEX, Vanna e Charm.
+- **Pinning / Gamma Gravity:** ranking heurístico de strikes por concentração de gamma, OI, proximidade do spot e DTE.
+- **Scorecard histórico:** mede toque, rejeição, rompimento e tempo até interação com Walls no EWZ e na projeção do WIN, sem usar dados futuros indisponíveis no momento do snapshot.
+- **Recibos reproduzíveis:** cenários podem ser salvos no navegador, repetidos e exportados em JSON.
+- **Ajuda contextual:** cada seção do dashboard possui um ícone de informação com explicação didática, forma de interpretação e limitações.
+
+O Stress Lab usa agregados por strike e mantém OI fixo; ele é um teste de sensibilidade, não uma previsão. O score de Gamma Gravity é relativo dentro do vencimento e não representa probabilidade de fechamento.
+
+A metodologia detalhada está em [CALCULO.md](CALCULO.md).
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:
@@ -159,6 +173,7 @@ collector/
 docs/
   index.html
   app.js
+  help.js            catálogo de ajuda contextual
   style.css
   data/
     latest.json       último GEX
