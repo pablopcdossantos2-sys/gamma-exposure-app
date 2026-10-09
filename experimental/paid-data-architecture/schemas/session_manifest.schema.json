@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Paid Lab Session Manifest",
+  "type": "object",
+  "required": ["provider", "session", "mode", "started_at", "streams", "license"],
+  "properties": {
+    "provider": {"type": "string"},
+    "session": {"type": "string"},
+    "mode": {"enum": ["realtime", "historical", "replay"]},
+    "started_at": {"type": "string"},
+    "ended_at": {"type": ["string", "null"]},
+    "streams": {"type": "array", "items": {"type": "string"}},
+    "symbols": {"type": "array", "items": {"type": "string"}},
+    "license": {
+      "type": "object",
+      "required": ["redistribution_allowed", "retention_allowed"],
+      "properties": {
+        "redistribution_allowed": {"type": "boolean"},
+        "retention_allowed": {"type": "boolean"},
+        "notes": {"type": "string"}
+      }
+    },
+    "files": {"type": "array", "items": {"type": "object"}},
+    "quality_flags": {"type": "array", "items": {"type": "string"}}
+  }
+}
