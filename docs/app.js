@@ -126,10 +126,15 @@ function timeLabel(ts,multi){var d=new Date(ts*1000);return d.toLocaleString("pt
 function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
 function chartView(key,total){
   var v=state.chartViews[key];
-  if(!v){v={count:Math.min(130,total||130),end:total||0,yZoom:1,yPan:0};state.chartViews[key]=v}
-  v.count=clamp(Math.round(v.count||130),Math.min(20,total||20),Math.max(20,total||20));
-  if(!v.end||v.end>total)v.end=total;
-  if(v.end<v.count)v.end=v.count;
+  if(total<=0){
+    if(!v){v={count:0,end:0,yZoom:1,yPan:0};state.chartViews[key]=v}
+    return v
+  }
+  if(!v){v={count:Math.min(130,total),end:total,yZoom:1,yPan:0};state.chartViews[key]=v}
+  v.count=clamp(Math.round(v.count||130),Math.min(20,total),total);
+  v.end=clamp(v.end||total,v.count,total);
+  v.yZoom=clamp(v.yZoom||1,.4,8);
+  v.yPan=clamp(v.yPan||0,-5,5);
   return v
 }
 function resetChartView(key){
@@ -137,9 +142,9 @@ function resetChartView(key){
   state.chartViews[key]={count:Math.min(130,total||130),end:total||0,yZoom:1,yPan:0}
 }
 function viewStatus(key,total){
-  var v=chartView(key,total),el=$(key+"ViewStatus");
-  if(!el)return;
-  var xZoom=(130/Math.max(1,v.count)).toFixed(2);
+  var el=$(key+"ViewStatus");if(!el)return;
+  if(total<=0){el.textContent="sem dados";return}
+  var v=chartView(key,total),xZoom=(130/Math.max(1,v.count)).toFixed(2);
   el.textContent=v.count+" candles · X "+xZoom+"× · Y "+v.yZoom.toFixed(2)+"×"+(v.end<total?" · histórico":" · último")
 }
 function renderPrice(key){
@@ -155,8 +160,8 @@ function adjustChartView(key,action){
   else if(action==="right")v.end=Math.min(total,v.end+Math.max(1,Math.round(v.count*.18)));
   else if(action==="y-in")v.yZoom=Math.min(8,v.yZoom*1.3);
   else if(action==="y-out")v.yZoom=Math.max(.4,v.yZoom/1.3);
-  else if(action==="up")v.yPan+=.14/v.yZoom;
-  else if(action==="down")v.yPan-=.14/v.yZoom;
+  else if(action==="up")v.yPan=clamp(v.yPan+.14/v.yZoom,-5,5);
+  else if(action==="down")v.yPan=clamp(v.yPan-.14/v.yZoom,-5,5);
   else if(action==="latest")v.end=total;
   else if(action==="reset"){resetChartView(key);v=state.chartViews[key]}
   if(v.count>total)v.count=total;
@@ -174,7 +179,7 @@ function startChartDrag(e,key,plotW,plotH,total){
     var vv=chartView(key,total);
     var shift=Math.round(dx/Math.max(1,dragState.plotW)*dragState.count);
     vv.end=clamp(dragState.startEnd-shift,vv.count,total);
-    vv.yPan=dragState.startPan+dy/Math.max(1,dragState.plotH)/Math.max(.4,vv.yZoom);
+    vv.yPan=clamp(dragState.startPan+dy/Math.max(1,dragState.plotH)/Math.max(.4,vv.yZoom),-5,5);
     if(!dragRAF){dragRAF=requestAnimationFrame(function(){dragRAF=null;renderPrice(key)})}
   }
   function up(){
