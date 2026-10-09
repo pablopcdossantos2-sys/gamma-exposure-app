@@ -178,5 +178,21 @@ class GexCoreTests(unittest.TestCase):
         self.assertEqual(activity_contracts[0]["volume"], 12)
 
 
+    def test_volume_weighted_gamma_metrics(self):
+        m = gex_core.volume_weighted_gamma_metrics(self.spot, self.contracts)
+        self.assertIn("volume_gamma_total", m)
+        self.assertIn("volume_call_wall", m)
+        self.assertIn("volume_put_wall", m)
+        self.assertTrue(m["volume_gamma_strikes"])
+        self.assertTrue(any(abs(r["net"]) > 0 for r in m["volume_gamma_strikes"]))
+
+    def test_merge_activity_adds_volume_gamma_fields(self):
+        res = gex_core.compute(self.spot, self.contracts)
+        gex_core.merge_activity_metrics(res, self.contracts)
+        self.assertIn("volume_gamma_total", res)
+        self.assertIn("volume_gamma_strikes", res)
+        self.assertTrue(all("volume_gamma_net" in row for row in res["strikes"]))
+
+
 if __name__ == "__main__":
     unittest.main()
