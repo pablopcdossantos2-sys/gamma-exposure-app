@@ -3,48 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GEX EWZ para WIN</title>
-<meta name="description" content="Níveis de Gamma Exposure do EWZ (Gamma Flip, Call Wall, Put Wall) convertidos para pontos do WIN.">
+<title>Gamma Exposure · EWZ → WIN</title>
+<meta name="description" content="Gamma Exposure do EWZ com gráfico por strike e níveis projetados nos gráficos de preço do EWZ e do WIN1!.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="wrap viz-root">
+<main class="wrap">
 
-  <header class="top">
+  <header class="hero">
     <div>
-      <h1>GEX do EWZ <span class="arrow">→</span> WIN</h1>
-      <p class="sub" id="status">Carregando…</p>
+      <p class="eyebrow">Gamma Exposure Dashboard</p>
+      <h1>EWZ <span>→</span> WIN1!</h1>
+      <p class="sub" id="status">Carregando dados de mercado…</p>
     </div>
-    <form class="win-form" id="winForm" autocomplete="off">
-      <label for="winInput">WIN agora (pontos)</label>
-      <div class="row">
-        <input id="winInput" inputmode="decimal" placeholder="ex.: 185000">
-        <button type="submit">Converter</button>
-      </div>
-      <p class="hint" id="ratioHint">Informe o preço do WIN no mesmo horário do dado do EWZ.</p>
-    </form>
+    <div class="source-box">
+      <span class="source-label">Conversão EWZ → WIN</span>
+      <strong id="ratioValue">—</strong>
+      <small id="ratioHint">calculada automaticamente pelos últimos candles</small>
+    </div>
   </header>
 
   <div id="demoBanner" class="banner" hidden>
-    Dados de <strong>demonstração</strong> (sintéticos, não são de mercado). A primeira coleta real do workflow substitui estes números.
+    O GEX exibido ainda é de <strong>demonstração</strong>. Os gráficos de preço podem ser reais mesmo enquanto o GEX não for substituído pela coleta do CBOE.
   </div>
   <div id="errorBanner" class="banner err" hidden></div>
 
-  <section class="kpis" id="kpis" aria-label="Resumo"></section>
+  <section class="kpis" id="kpis" aria-label="Resumo do Gamma Exposure"></section>
 
-  <section class="card">
-    <h2>Níveis</h2>
-    <div class="table-scroll">
-      <table id="levelsTable">
-        <thead><tr><th>Nível</th><th class="num">EWZ (US$)</th><th class="num">WIN (pontos)</th><th class="num">vs. preço atual</th><th>Leitura</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="card">
+  <section class="card focal">
     <div class="card-head">
-      <h2>GEX por strike</h2>
+      <div>
+        <p class="section-kicker">Mapa de opções</p>
+        <h2>Gamma Exposure (GEX) por strike</h2>
+        <p class="note">Calls positivas, puts negativas e GEX líquido. As linhas verticais mostram preço, Gamma Flip e paredes principais.</p>
+      </div>
       <label class="sel">Faixa
         <select id="rangeSel">
           <option value="0.10">±10%</option>
@@ -54,36 +46,72 @@
         </select>
       </label>
     </div>
-    <div class="legend" id="legend1"></div>
-    <div class="chart" id="chartStrikes"></div>
-    <details><summary>Ver como tabela</summary>
-      <div class="table-scroll"><table id="strikeTable"><thead><tr><th class="num">Strike EWZ</th><th class="num">WIN</th><th class="num">GEX calls</th><th class="num">GEX puts</th><th class="num">GEX líquido</th></tr></thead><tbody></tbody></table></div>
-    </details>
+    <div class="legend" id="legendGex"></div>
+    <div class="chart chart-gex" id="chartGex"></div>
+  </section>
+
+  <section class="price-grid">
+    <article class="card price-card">
+      <div class="card-head">
+        <div>
+          <p class="section-kicker">Preço + zonas de gamma</p>
+          <h2>EWZ · candles de 5 minutos</h2>
+          <p class="note" id="ewzMeta">AMEX:EWZ</p>
+        </div>
+        <span class="pill">EWZ</span>
+      </div>
+      <div class="legend compact" id="legendEwz"></div>
+      <div class="chart price-chart" id="chartEwz"></div>
+    </article>
+
+    <article class="card price-card">
+      <div class="card-head">
+        <div>
+          <p class="section-kicker">Preço + zonas convertidas</p>
+          <h2>WIN1! · candles de 5 minutos</h2>
+          <p class="note" id="winMeta">BMFBOVESPA:WIN1!</p>
+        </div>
+        <span class="pill">WIN</span>
+      </div>
+      <div class="legend compact" id="legendWin"></div>
+      <div class="chart price-chart" id="chartWin"></div>
+    </article>
   </section>
 
   <section class="card">
-    <h2>Curva de GEX total × preço do EWZ</h2>
-    <p class="note">Onde a curva cruza o zero fica o Gamma Flip.</p>
-    <div class="chart" id="chartCurve"></div>
-  </section>
-
-  <section class="card">
-    <h2>Histórico dos níveis (EWZ)</h2>
-    <div class="legend" id="legend3"></div>
-    <div class="chart" id="chartHist"></div>
-    <p class="note" id="histNote"></p>
-  </section>
-
-  <section class="card">
-    <h2>Como é calculado</h2>
-    <div class="prose">
-      <p><strong>1. GEX por contrato</strong> (US$ por 1% de movimento): <code>gamma × open interest × 100 × preço² × 0,01</code>. Calls somam (+), puts subtraem (−). É a convenção padrão, não a posição real dos dealers.</p>
-      <p><strong>2. Call Wall / Put Wall</strong>: strike com o maior GEX de calls / o GEX de puts mais negativo. Resistência e suporte prováveis.</p>
-      <p><strong>3. Gamma Flip</strong>: o gamma é recalculado por Black-Scholes (com a IV de cada contrato) para preços entre 80% e 120% do EWZ; o flip é onde o GEX total cruza zero, interpolado entre dois pontos da grade.</p>
-      <p><strong>4. Conversão para WIN</strong>: <code>nível WIN = nível EWZ × (WIN ÷ EWZ)</code>, arredondado a múltiplos de 5. A razão usa o WIN que você informa e o preço do EWZ do dado; ela embute dólar e base do futuro e muda ao longo do dia.</p>
-      <p><strong>Limites</strong>: dados do CBOE com ~15 min de atraso; o open interest atualiza uma vez por dia; o EWZ é proxy do Ibovespa em dólares. Isto é informação de mercado, não recomendação.</p>
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Níveis operacionais</p>
+        <h2>Leitura EWZ ↔ WIN</h2>
+      </div>
+      <form class="override" id="winForm" autocomplete="off">
+        <label for="winInput">Ajuste manual do WIN (opcional)</label>
+        <div>
+          <input id="winInput" inputmode="decimal" placeholder="ex.: 187500">
+          <button type="submit">Aplicar</button>
+          <button type="button" class="ghost" id="autoBtn">Auto</button>
+        </div>
+      </form>
     </div>
-    <p class="links">Dados originais: <a href="data/latest.json">latest.json</a> · <a href="data/history.json">history.json</a> · respostas brutas do CBOE em <code>data/raw/</code> no repositório.</p>
+    <div class="table-scroll">
+      <table id="levelsTable">
+        <thead>
+          <tr><th>Nível</th><th class="num">EWZ</th><th class="num">WIN</th><th class="num">Distância do EWZ</th><th>Interpretação</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card explainer">
+    <h2>Como ler as regiões</h2>
+    <div class="explain-grid">
+      <div><strong>Gamma positivo</strong><p>Faixa acima do Gamma Flip. Em termos de modelo, tende a favorecer movimentos mais amortecidos e comportamento de reversão à média.</p></div>
+      <div><strong>Gamma negativo</strong><p>Faixa abaixo do Gamma Flip. Em termos de modelo, tende a favorecer aceleração e maior sensibilidade a rompimentos.</p></div>
+      <div><strong>Call Wall</strong><p>Strike com maior GEX de calls. É projetado como uma região potencial de oferta/resistência.</p></div>
+      <div><strong>Put Wall</strong><p>Strike com maior magnitude de GEX de puts. É projetado como uma região potencial de demanda/suporte.</p></div>
+    </div>
+    <p class="footnote">A projeção no WIN usa a razão entre os últimos candles disponíveis de WIN1! e EWZ. É uma transformação de referência, não equivalência econômica perfeita entre os ativos. Os preços coletados via TradingView podem ser atrasados conforme a disponibilidade pública do feed.</p>
   </section>
 
 </main>
