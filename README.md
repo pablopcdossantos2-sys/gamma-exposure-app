@@ -71,6 +71,19 @@ O Stress Lab usa agregados por strike e mantém OI fixo; ele é um teste de sens
 
 A metodologia detalhada está em [CALCULO.md](CALCULO.md).
 
+## Volume anômalo, Put/Call, suavização e contexto automático
+
+O dashboard também inclui:
+
+- **Volume anômalo:** compara o volume acumulado por expiry + strike + lado com sessões anteriores em horário semelhante. Só declara anomalia quando há pelo menos 3 sessões comparáveis e o robust z/magnitude ultrapassam os critérios documentados.
+- **Put/Call Ratios:** P/C por OI e por volume, no agregado, por vencimento e no histórico intradiário.
+- **Net GEX suavizado:** filtro de Kalman opcional com responsividade lenta, média ou rápida; a linha bruta permanece sempre visível e continua sendo a fonte oficial dos demais cálculos.
+- **Contexto automático:** resumo determinístico, em linguagem simples, sobre regime de gamma, Walls, Put/Call, IV, pinning, mudanças desde a abertura e qualidade dos dados.
+
+Para métricas de volume, o coletor agora usa a chain válida completa, incluindo contratos com `OI = 0`. Esses contratos continuam excluídos do GEX propriamente dito quando sua contribuição é zero.
+
+Enquanto ainda não houver três sessões históricas anteriores compatíveis, o painel de volume anômalo informa **baseline insuficiente** em vez de gerar um sinal artificial.
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:
