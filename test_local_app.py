@@ -10,11 +10,11 @@ class LocalAppTests(unittest.TestCase):
         self.assertTrue((local_app.DOCS_DIR / "index.html").exists())
 
     def test_choose_port_skips_occupied_port(self):
+        occupied = local_app.choose_port("127.0.0.1", 18080, attempts=20)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(("127.0.0.1", 0))
-        occupied = sock.getsockname()[1]
+        sock.bind(("127.0.0.1", occupied))
         try:
-            chosen = local_app.choose_port("127.0.0.1", occupied, attempts=3)
+            chosen = local_app.choose_port("127.0.0.1", occupied, attempts=5)
             self.assertNotEqual(chosen, occupied)
             self.assertGreater(chosen, occupied)
         finally:
