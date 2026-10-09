@@ -19,6 +19,17 @@ nível WIN = nível EWZ × razão
 
 O valor é arredondado ao múltiplo de 5 mais próximo. A página também permite um ajuste manual opcional do WIN.
 
+## Heatmap, vencimentos e comparação histórica
+
+O dashboard preserva a decomposição do GEX por vencimento nas novas coletas.
+
+- **Filtro por vencimento:** escolha “Todos os vencimentos” ou uma expiry específica. KPIs, Walls, Flip, gráfico por strike e overlays EWZ/WIN passam a refletir a seleção.
+- **Heatmap Strike × Vencimento:** matriz visual do GEX líquido por strike/expiry, com intensidade proporcional a `|GEX|`.
+- **Comparador de snapshots:** escolha duas leituras históricas para comparar Spot, Net GEX, Call Wall, Put Wall, Gamma Flip e o perfil de GEX por strike.
+- Snapshots antigos, coletados antes dessa estrutura, continuam disponíveis em modo agregado.
+
+O planejamento das próximas funcionalidades está em [ROADMAP.md](../ROADMAP.md) quando servido no repositório GitHub, ou diretamente no arquivo `ROADMAP.md` da raiz.
+
 ## Visualização configurável das regiões de GEX
 
 Nos gráficos de preço do EWZ e do WIN, o usuário escolhe como as regiões de Gamma Exposure serão mostradas:
