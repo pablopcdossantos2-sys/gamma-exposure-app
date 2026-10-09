@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,prices:null,range:.15,manualWin:null};
+var state={gex:null,prices:null,range:.15,manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium"};
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 var fmtPct=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1,signDisplay:"exceptZero"});
@@ -97,22 +97,43 @@ function chartGex(){
 function gammaZones(mapper){
   var d=state.gex,rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
   for(var i=1;i<rows.length;i++)gap=Math.min(gap,rows[i].k-rows[i-1].k);if(!isFinite(gap))gap=.5;
-  var candidates=rows.filter(function(r){return r.net!==0}).sort(function(a,b){return Math.abs(b.net)-Math.abs(a.net)}).slice(0,7);
+  var candidates=rows.filter(function(r){return r.net!==0}).sort(function(a,b){return Math.abs(b.net)-Math.abs(a.net)}).slice(0,state.zoneCount);
   var max=candidates.length?Math.abs(candidates[0].net):1;
   return candidates.map(function(r){return{center:mapper(r.k),lo:mapper(r.k-gap*.36),hi:mapper(r.k+gap*.36),positive:r.net>0,strength:Math.max(.12,Math.abs(r.net)/max)}})
+}
+function zoneOpacity(z){
+  var mult=state.zoneOpacity==="low"?.55:state.zoneOpacity==="high"?1.6:1;
+  return Math.min(.2,(.025+.08*z.strength)*mult).toFixed(3)
+}
+function renderViewControls(){
+  var showZones=state.viewMode!=="levels";
+  $("gexViewMode").value=state.viewMode;
+  $("zoneCountSel").value=String(state.zoneCount);
+  $("zoneOpacitySel").value=state.zoneOpacity;
+  $("zoneCountSel").disabled=!showZones;
+  $("zoneOpacitySel").disabled=!showZones;
+  $("zoneCountWrap").classList.toggle("disabled",!showZones);
+  $("zoneOpacityWrap").classList.toggle("disabled",!showZones);
+  var msg=state.viewMode==="levels"
+    ?"Níveis principais ativos; faixas de intensidade desativadas."
+    :state.viewMode==="intensity"
+      ?"Somente as "+state.zoneCount+" faixas de maior |GEX| estão ativas; níveis principais ocultos."
+      :"Níveis principais e as "+state.zoneCount+" faixas de maior |GEX| estão ativos.";
+  $("gexViewHint").textContent=msg+" Intensidade visual: "+(state.zoneOpacity==="low"?"suave":state.zoneOpacity==="high"?"forte":"média")+"."
 }
 function timeLabel(ts,multi){var d=new Date(ts*1000);return d.toLocaleString("pt-BR",multi?{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}:{hour:"2-digit",minute:"2-digit"})}
 function priceChart(id,key,mapper,legendId){
   var host=$(id);host.innerHTML="";var all=lastBars(key);
   if(!all.length){host.innerHTML='<p class="note">Dados de preço indisponíveis nesta coleta.</p>';return}
-  var bars=all.slice(-130),last=bars[bars.length-1].c,zones=gammaZones(mapper),keys=levelRows().filter(function(r){return r.v!=null}).map(function(r){return{name:r.name,v:mapper(r.v),color:r.color}});
+  var showLevels=state.viewMode!=="intensity",showZones=state.viewMode!=="levels";
+  var bars=all.slice(-130),last=bars[bars.length-1].c,zones=showZones?gammaZones(mapper):[],keys=showLevels?levelRows().filter(function(r){return r.v!=null}).map(function(r){return{name:r.name,v:mapper(r.v),color:r.color}}):[];
   var relevant=keys.filter(function(k){return k.v&&Math.abs(k.v/last-1)<=.18}),vals=[];bars.forEach(function(b){vals.push(b.l,b.h)});relevant.forEach(function(k){vals.push(k.v)});zones.forEach(function(z){if(z.lo&&Math.abs(z.center/last-1)<=.18)vals.push(z.lo,z.hi)});
   var ymin=Math.min.apply(null,vals),ymax=Math.max.apply(null,vals),pad=(ymax-ymin)*.07||1;ymin-=pad;ymax+=pad;
   var W=1220,H=440,m={l:72,r:125,t:22,b:46},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Gráfico de preço com zonas de Gamma Exposure"},host);
   var x=function(i){return m.l+i/(bars.length-1)*(W-m.l-m.r)},y=function(v){return m.t+(1-(v-ymin)/(ymax-ymin))*(H-m.t-m.b)};
   niceTicks(ymin,ymax,6).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:"grid"},svg);svgText(svg,m.l-8,y(t)+4,key==="win"?fmt0.format(t):fmt2.format(t),{"text-anchor":"end"})});
-  var flip=state.gex.flip==null?null:mapper(state.gex.flip);if(flip!=null){var fy=y(Math.max(ymin,Math.min(ymax,flip)));if(flip>ymin&&flip<ymax){svgEl("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:Math.max(0,fy-m.t),fill:cssVar("--green"),"fill-opacity":.035},svg);svgEl("rect",{x:m.l,y:fy,width:W-m.l-m.r,height:Math.max(0,H-m.b-fy),fill:cssVar("--red"),"fill-opacity":.035},svg)}}
-  zones.forEach(function(z){if(!z.center||z.hi<ymin||z.lo>ymax)return;var top=y(Math.min(ymax,z.hi)),bot=y(Math.max(ymin,z.lo));svgEl("rect",{x:m.l,y:top,width:W-m.l-m.r,height:Math.max(1,bot-top),fill:z.positive?cssVar("--blue"):cssVar("--orange"),"fill-opacity":(.025+.08*z.strength).toFixed(3)},svg)});
+  if(showLevels){var flip=state.gex.flip==null?null:mapper(state.gex.flip);if(flip!=null){var fy=y(Math.max(ymin,Math.min(ymax,flip)));if(flip>ymin&&flip<ymax){svgEl("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:Math.max(0,fy-m.t),fill:cssVar("--green"),"fill-opacity":.035},svg);svgEl("rect",{x:m.l,y:fy,width:W-m.l-m.r,height:Math.max(0,H-m.b-fy),fill:cssVar("--red"),"fill-opacity":.035},svg)}}}
+  zones.forEach(function(z){if(!z.center||z.hi<ymin||z.lo>ymax)return;var top=y(Math.min(ymax,z.hi)),bot=y(Math.max(ymin,z.lo));svgEl("rect",{x:m.l,y:top,width:W-m.l-m.r,height:Math.max(1,bot-top),fill:z.positive?cssVar("--blue"):cssVar("--orange"),"fill-opacity":zoneOpacity(z)},svg)});
   relevant.forEach(function(k){var yy=y(k.v),dash=k.name==="Gamma Flip"?"7 4":"4 3";svgEl("line",{x1:m.l,x2:W-m.r,y1:yy,y2:yy,stroke:k.color,"stroke-width":k.name==="Gamma Flip"?2:1.4,"stroke-dasharray":dash},svg);svgText(svg,W-m.r+7,yy+4,k.name.replace("Preço EWZ do GEX","GEX spot")+" "+(key==="win"?fmt0.format(k.v):fmt2.format(k.v)),{class:"lbl",style:"fill:"+k.color})});
   var step=(W-m.l-m.r)/Math.max(1,bars.length-1),bw=Math.max(2,Math.min(7,step*.62));
   bars.forEach(function(b,i){var xx=x(i),up=b.c>=b.o,col=up?cssVar("--green"):cssVar("--red");svgEl("line",{x1:xx,x2:xx,y1:y(b.h),y2:y(b.l),stroke:col,"stroke-width":1},svg);var top=y(Math.max(b.o,b.c)),bot=y(Math.min(b.o,b.c));svgEl("rect",{x:xx-bw/2,y:top,width:bw,height:Math.max(1,bot-top),fill:col,rx:.7},svg)});
@@ -120,14 +141,25 @@ function priceChart(id,key,mapper,legendId){
   var cross=svgEl("line",{y1:m.t,y2:H-m.b,stroke:cssVar("--axis"),"stroke-width":1,visibility:"hidden"},svg),hit=svgEl("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,class:"hit"},svg);
   hit.addEventListener("pointermove",function(e){var box=svg.getBoundingClientRect(),vx=(e.clientX-box.left)/box.width*W,ix=Math.max(0,Math.min(bars.length-1,Math.round((vx-m.l)/(W-m.l-m.r)*(bars.length-1)))),b=bars[ix];cross.setAttribute("x1",x(ix));cross.setAttribute("x2",x(ix));cross.setAttribute("visibility","visible");showTip(e,timeLabel(b.t,true),[["Abertura",key==="win"?fmt0.format(b.o):fmt2.format(b.o)],["Máxima",key==="win"?fmt0.format(b.h):fmt2.format(b.h)],["Mínima",key==="win"?fmt0.format(b.l):fmt2.format(b.l)],["Fechamento",key==="win"?fmt0.format(b.c):fmt2.format(b.c)],["Volume",fmt0.format(b.v||0)]])});
   hit.addEventListener("pointerleave",function(){hideTip();cross.setAttribute("visibility","hidden")});
-  legend(legendId,[{name:"Alta",color:cssVar("--green"),cls:"sq"},{name:"Baixa",color:cssVar("--red"),cls:"sq"},{name:"Zonas GEX +",color:cssVar("--blue"),cls:"sq"},{name:"Zonas GEX −",color:cssVar("--orange"),cls:"sq"},{name:"Gamma Flip",color:cssVar("--purple"),dash:true}])
+  var legendItems=[{name:"Alta",color:cssVar("--green"),cls:"sq"},{name:"Baixa",color:cssVar("--red"),cls:"sq"}];
+  if(showZones){legendItems.push({name:"Faixas GEX +",color:cssVar("--blue"),cls:"sq"},{name:"Faixas GEX −",color:cssVar("--orange"),cls:"sq"})}
+  if(showLevels){legendItems.push({name:"Gamma Flip / níveis",color:cssVar("--purple"),dash:true})}
+  legend(legendId,legendItems)
 }
 function renderPrices(){priceChart("chartEwz","ewz",function(v){return v},"legendEwz");priceChart("chartWin","win",function(v){return toWin(v)},"legendWin")}
-function renderAll(){renderHeader();renderKpis();renderTable();chartGex();renderPrices()}
+function renderAll(){renderHeader();renderKpis();renderTable();renderViewControls();chartGex();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
+  var savedMode=store("gex.viewMode"),savedCount=parseInt(store("gex.zoneCount"),10),savedOpacity=store("gex.zoneOpacity");
+  if(["levels","intensity","both"].indexOf(savedMode)>=0)state.viewMode=savedMode;
+  if([3,5,7,10].indexOf(savedCount)>=0)state.zoneCount=savedCount;
+  if(["low","medium","high"].indexOf(savedOpacity)>=0)state.zoneOpacity=savedOpacity;
   $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex()});
+  $("gexViewMode").addEventListener("change",function(e){state.viewMode=e.target.value;store("gex.viewMode",state.viewMode);if(state.gex){renderViewControls();renderPrices()}});
+  $("zoneCountSel").addEventListener("change",function(e){state.zoneCount=parseInt(e.target.value,10);store("gex.zoneCount",String(state.zoneCount));if(state.gex){renderViewControls();renderPrices()}});
+  $("zoneOpacitySel").addEventListener("change",function(e){state.zoneOpacity=e.target.value;store("gex.zoneOpacity",state.zoneOpacity);if(state.gex){renderViewControls();renderPrices()}});
+  $("resetViewBtn").addEventListener("click",function(){state.viewMode="levels";state.zoneCount=7;state.zoneOpacity="medium";store("gex.viewMode","levels");store("gex.zoneCount","7");store("gex.zoneOpacity","medium");if(state.gex){renderViewControls();renderPrices()}});
   $("winForm").addEventListener("submit",function(e){e.preventDefault();var raw=$("winInput").value.replace(/\./g,"").replace(",", "."),v=parseFloat(raw);state.manualWin=v>0?v:null;store("gex.manualWin",state.manualWin?String(state.manualWin):"");if(state.gex)renderAll()});
   $("autoBtn").addEventListener("click",function(){state.manualWin=null;$("winInput").value="";store("gex.manualWin","");if(state.gex)renderAll()});
   Promise.all([getJson("data/latest.json"),getJson("data/prices.json").catch(function(){return null})]).then(function(r){state.gex=r[0];state.prices=r[1];renderAll();if(state.prices&&state.prices.errors&&state.prices.errors.length){var b=$("errorBanner");b.hidden=false;b.textContent="Aviso na coleta de preços: "+state.prices.errors.join(" · ")}}).catch(function(err){$("status").textContent="Não foi possível carregar o dashboard.";var b=$("errorBanner");b.hidden=false;b.textContent=err.message})
