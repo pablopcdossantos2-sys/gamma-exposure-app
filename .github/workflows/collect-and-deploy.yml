@@ -1,10 +1,10 @@
-name: Coletar GEX e publicar no Pages
+name: Coletar mercado e publicar no Pages
 
 on:
   schedule:
-    # Seg-sex, de hora em hora, das 13:05 as 21:05 UTC (cobre o pregao dos EUA em EDT e EST).
-    # O GitHub pode atrasar execucoes agendadas em alguns minutos.
-    - cron: "5 13-21 * * 1-5"
+    # A cada 15 min em dias úteis durante a janela que cobre B3 + mercado dos EUA.
+    # Minutos deslocados do quarto de hora reduzem a chance de fila do GitHub Actions.
+    - cron: "7,22,37,52 12-22 * * 1-5"
   workflow_dispatch:
     inputs:
       save_raw:
@@ -13,14 +13,20 @@ on:
         default: true
   push:
     branches: [main]
-    paths: ["docs/**", "collector/**", ".github/workflows/**"]
+    paths:
+      - "docs/index.html"
+      - "docs/app.js"
+      - "docs/style.css"
+      - "collector/**"
+      - ".github/workflows/**"
+      - "README.md"
+      - "CALCULO.md"
 
 permissions:
   contents: write
   pages: write
   id-token: write
 
-# Evita duas execucoes ao mesmo tempo mexendo nos mesmos arquivos.
 concurrency:
   group: gex-pages
   cancel-in-progress: false
@@ -42,28 +48,40 @@ jobs:
 
       - run: pip install -r collector/requirements.txt
 
-      - name: Coletar EWZ (CBOE)
-        id: collect
-        # Se o CBOE falhar, o site ainda e publicado com os ultimos dados.
+      - name: Coletar Gamma Exposure do EWZ (CBOE)
+        id: collect_gex
         continue-on-error: true
         env:
           SYMBOL: ${{ vars.GEX_SYMBOL || 'EWZ' }}
           MAX_DTE: ${{ vars.GEX_MAX_DTE || '' }}
           MANUAL_RAW: ${{ inputs.save_raw }}
         run: |
-          # Resposta original: guardada 2x por dia (hora cheia 15 e 20 UTC) e em execucoes manuais.
           HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
           ARGS=""
-          if [ "$HOUR" = "15" ] || [ "$HOUR" = "20" ] || [ "$MANUAL_RAW" = "true" ]; then ARGS="--save-raw"; fi
+          # Guarda raw duas vezes por dia e em execuções manuais.
+          if { [ "$HOUR" = "15" ] || [ "$HOUR" = "20" ]; } && [ "$MINUTE" = "07" ]; then ARGS="--save-raw"; fi
+          if [ "$MANUAL_RAW" = "true" ]; then ARGS="--save-raw"; fi
           if [ -n "$MAX_DTE" ]; then ARGS="$ARGS --max-dte $MAX_DTE"; fi
           python collector/collect.py --symbol "$SYMBOL" $ARGS
 
-      - name: Aviso se a coleta falhou
-        if: steps.collect.outcome == 'failure'
-        run: echo "::warning::Coleta falhou (veja o log do passo anterior). O site foi publicado com os dados anteriores."
+      - name: Coletar candles de EWZ e WIN1!
+        id: collect_prices
+        continue-on-error: true
+        run: python collector/collect_prices.py
 
-      - name: Salvar dados no repositorio
-        if: steps.collect.outcome == 'success'
+      - name: Avisos de coleta
+        if: always()
+        run: |
+          if [ "${{ steps.collect_gex.outcome }}" != "success" ]; then
+            echo "::warning::A coleta do GEX falhou; o site usará o último GEX salvo."
+          fi
+          if [ "${{ steps.collect_prices.outcome }}" != "success" ]; then
+            echo "::warning::A coleta de preços falhou; o site usará os últimos candles salvos, se existirem."
+          fi
+
+      - name: Salvar dados coletados no repositório
+        if: always()
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
@@ -72,7 +90,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Nada novo para salvar."
           else
-            git commit -m "dados: coleta GEX $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git commit -m "dados: mercado $(date -u +'%Y-%m-%d %H:%M UTC')"
             git pull --rebase origin "${GITHUB_REF_NAME}"
             git push
           fi
