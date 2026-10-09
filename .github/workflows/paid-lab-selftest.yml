@@ -1,0 +1,27 @@
+name: Paid Lab Self-Test
+
+on:
+  push:
+    paths:
+      - "experimental/paid-data-architecture/**"
+      - ".github/workflows/paid-lab-selftest.yml"
+  pull_request:
+    paths:
+      - "experimental/paid-data-architecture/**"
+      - ".github/workflows/paid-lab-selftest.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Self-test isolado
+        run: python experimental/paid-data-architecture/selftest.py
+      - name: Unit tests isolados
+        run: python -m unittest discover -s experimental/paid-data-architecture/tests -p "test_*.py"
