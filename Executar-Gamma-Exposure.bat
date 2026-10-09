@@ -29,12 +29,12 @@ pause
 goto FIM
 
 :LOCALIZAR_PYTHON
-where py >nul 2>nul
+py -3 --version >nul 2>nul
 if %errorlevel%==0 (
     set "PY_CMD=py -3"
     goto :eof
 )
-where python >nul 2>nul
+python --version >nul 2>nul
 if %errorlevel%==0 (
     set "PY_CMD=python"
     goto :eof
