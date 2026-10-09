@@ -564,6 +564,11 @@ function priceChart(id,key,mapper,legendId){
   }
   zones.forEach(function(z){if(!z.center||z.hi<ymin||z.lo>ymax)return;var top=y(Math.min(ymax,z.hi)),bot=y(Math.max(ymin,z.lo));svgEl("rect",{x:m.l,y:top,width:plotW,height:Math.max(1,bot-top),fill:z.positive?cssVar("--blue"):cssVar("--orange"),"fill-opacity":zoneOpacity(z)},plot)});
   relevant.forEach(function(k){if(k.v<ymin||k.v>ymax)return;var yy=y(k.v),dash=k.name==="Gamma Flip"?"7 4":"4 3";svgEl("line",{x1:m.l,x2:W-m.r,y1:yy,y2:yy,stroke:k.color,"stroke-width":k.name==="Gamma Flip"?2:1.4,"stroke-dasharray":dash},plot);svgText(svg,W-m.r+7,yy+4,k.name.replace("Preço EWZ do GEX","GEX spot")+" "+(key==="win"?fmt0.format(k.v):fmt2.format(k.v)),{class:"lbl",style:"fill:"+k.color})});
+  if(state.advancedOverlay!=="none"){
+    var gd=activeGex(),metric=state.advancedOverlay,col=metricColor(metric);
+    var tops=(gd.strikes||[]).filter(function(s){return s[metric]!=null}).sort(function(a,b){return Math.abs(b[metric])-Math.abs(a[metric])}).slice(0,3);
+    tops.forEach(function(s,idx){var lv=mapper(s.k);if(lv==null||lv<ymin||lv>ymax)return;var yy=y(lv);svgEl("line",{x1:m.l,x2:W-m.r,y1:yy,y2:yy,stroke:col,"stroke-width":1.2,"stroke-dasharray":"2 5","stroke-opacity":.8},plot);svgText(svg,W-m.r+7,yy-4,metricLabel(metric)+" #"+(idx+1)+" "+(key==="win"?fmt0.format(lv):fmt2.format(lv)),{class:"lbl",style:"fill:"+col})})
+  }
   var step=plotW/Math.max(1,bars.length-1),bw=Math.max(2,Math.min(10,step*.62));
   bars.forEach(function(b,i){var xx=x(i),up=b.c>=b.o,col=up?cssVar("--green"):cssVar("--red");svgEl("line",{x1:xx,x2:xx,y1:y(b.h),y2:y(b.l),stroke:col,"stroke-width":1},plot);var top=y(Math.max(b.o,b.c)),bot=y(Math.min(b.o,b.c));svgEl("rect",{x:xx-bw/2,y:top,width:bw,height:Math.max(1,bot-top),fill:col,rx:.7},plot)});
   var multi=new Date(bars[0].t*1000).toDateString()!==new Date(bars[bars.length-1].t*1000).toDateString();
@@ -599,10 +604,11 @@ function priceChart(id,key,mapper,legendId){
   var legendItems=[{name:"Alta",color:cssVar("--green"),cls:"sq"},{name:"Baixa",color:cssVar("--red"),cls:"sq"}];
   if(showZones){legendItems.push({name:"Faixas GEX +",color:cssVar("--blue"),cls:"sq"},{name:"Faixas GEX −",color:cssVar("--orange"),cls:"sq"})}
   if(showLevels){legendItems.push({name:"Gamma Flip / níveis",color:cssVar("--purple"),dash:true})}
+  if(state.advancedOverlay!=="none"){legendItems.push({name:"Top "+metricLabel(state.advancedOverlay),color:metricColor(state.advancedOverlay),dash:true})}
   legend(legendId,legendItems);viewStatus(key,all.length)
 }
 function renderPrices(){renderPrice("ewz");renderPrice("win")}
-function renderAll(){renderHeader();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();chartGex();chartHeatmap();renderComparison();renderPrices()}
+function renderAll(){renderHeader();renderExpiryControls();renderKpis();renderTable();renderViewControls();renderSnapshotControls();renderCompareControls();renderTimeMapControls();chartGex();chartHeatmap();renderComparison();renderStructure();renderAdvanced();renderPrices()}
 function getJson(path){return fetch(path+"?v="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(path+" HTTP "+r.status);return r.json()})}
 function init(){
   var saved=parseFloat(store("gex.manualWin"));if(saved>0){state.manualWin=saved;$("winInput").value=String(saved)}
@@ -610,8 +616,11 @@ function init(){
   if(["levels","intensity","both"].indexOf(savedMode)>=0)state.viewMode=savedMode;
   if([3,5,7,10].indexOf(savedCount)>=0)state.zoneCount=savedCount;
   if(["low","medium","high"].indexOf(savedOpacity)>=0)state.zoneOpacity=savedOpacity;
-  $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison()});
-  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderPrices()});
+  $("rangeSel").addEventListener("change",function(e){state.range=parseFloat(e.target.value);chartGex();chartHeatmap();renderComparison();renderAdvanced();var d=$("timeMapDateSelect").value;if(d&&state.timeMapCache[d])renderTimeMap(d)});
+  $("expirySelect").addEventListener("change",function(e){state.expiryFilter=e.target.value;renderExpiryControls();renderKpis();renderTable();chartGex();chartHeatmap();renderStructure();renderAdvanced();renderPrices();var d=$("timeMapDateSelect").value;if(d)loadTimeMapDay(d)});
+  $("timeMapDateSelect").addEventListener("change",function(e){loadTimeMapDay(e.target.value)});
+  $("advancedMetricSelect").addEventListener("change",function(e){state.advancedMetric=e.target.value;renderAdvanced()});
+  $("advancedOverlaySelect").addEventListener("change",function(e){state.advancedOverlay=e.target.value;renderPrices()});
   $("compareBtn").addEventListener("click",loadCompare);
   $("compareSwapBtn").addEventListener("click",function(){var a=$("compareASelect").value,b=$("compareBSelect").value;$("compareASelect").value=b;$("compareBSelect").value=a;loadCompare()});
   document.querySelectorAll(".chart-tool").forEach(function(btn){btn.addEventListener("click",function(){adjustChartView(btn.getAttribute("data-chart"),btn.getAttribute("data-action"))})});
@@ -621,7 +630,7 @@ function init(){
   $("gexViewMode").addEventListener("change",function(e){state.viewMode=e.target.value;store("gex.viewMode",state.viewMode);if(state.gex){renderViewControls();renderPrices()}});
   $("zoneCountSel").addEventListener("change",function(e){state.zoneCount=parseInt(e.target.value,10);store("gex.zoneCount",String(state.zoneCount));if(state.gex){renderViewControls();renderPrices()}});
   $("zoneOpacitySel").addEventListener("change",function(e){state.zoneOpacity=e.target.value;store("gex.zoneOpacity",state.zoneOpacity);if(state.gex){renderViewControls();renderPrices()}});
-  $("resetViewBtn").addEventListener("click",function(){state.viewMode="levels";state.zoneCount=7;state.zoneOpacity="medium";store("gex.viewMode","levels");store("gex.zoneCount","7");store("gex.zoneOpacity","medium");if(state.gex){renderViewControls();renderPrices()}});
+  $("resetViewBtn").addEventListener("click",function(){state.viewMode="levels";state.zoneCount=7;state.zoneOpacity="medium";state.advancedOverlay="none";$("advancedOverlaySelect").value="none";store("gex.viewMode","levels");store("gex.zoneCount","7");store("gex.zoneOpacity","medium");if(state.gex){renderViewControls();renderPrices()}});
   $("winForm").addEventListener("submit",function(e){e.preventDefault();var raw=$("winInput").value.replace(/\./g,"").replace(",", "."),v=parseFloat(raw);state.manualWin=v>0?v:null;store("gex.manualWin",state.manualWin?String(state.manualWin):"");if(state.gex)renderAll()});
   $("autoBtn").addEventListener("click",function(){state.manualWin=null;$("winInput").value="";store("gex.manualWin","");if(state.gex)renderAll()});
   Promise.all([
