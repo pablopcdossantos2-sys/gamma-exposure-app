@@ -92,7 +92,7 @@ def fetch_bars(symbol, interval=INTERVAL, bars=BARS):
                 continue
             for payload in _iter_frames(raw):
                 if payload.startswith("~h~"):
-                    ws.send(_frame("heartbeat", [payload]))
+                    ws.send(f"~m~{len(payload)}~m~{payload}")
                     continue
                 try:
                     obj = json.loads(payload)
