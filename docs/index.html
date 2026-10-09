@@ -10,6 +10,11 @@
 <body>
 <main class="wrap">
 
+  <nav class="site-nav" aria-label="Navegação principal">
+    <a class="active" href="index.html">Dashboard</a>
+    <a href="entenda-gex.html">Entenda o GEX</a>
+  </nav>
+
   <header class="hero">
     <div>
       <p class="eyebrow">Gamma Exposure Dashboard</p>
@@ -135,6 +140,7 @@
             <button type="button" class="chart-tool" data-chart="ewz" data-action="right" title="Avançar no histórico">→</button>
             <button type="button" class="chart-tool" data-chart="ewz" data-action="up" title="Mover escala para cima">↑</button>
             <button type="button" class="chart-tool" data-chart="ewz" data-action="down" title="Mover escala para baixo">↓</button>
+            <button type="button" class="chart-tool ghost center-y" data-chart="ewz" data-action="center-y" title="Centralizar preço verticalmente mantendo o zoom Y">C·Y</button>
             <button type="button" class="chart-tool ghost" data-chart="ewz" data-action="latest" title="Ir ao candle mais recente">▸|</button>
             <button type="button" class="chart-tool ghost" data-chart="ewz" data-action="reset" title="Restaurar zoom e posição">↺</button>
           </div>
@@ -142,7 +148,7 @@
         <span class="chart-view-status chart-view-status-overlay" id="ewzViewStatus"></span>
         <div class="chart price-chart" id="chartEwz"></div>
       </div>
-      <p class="chart-help">Arraste para mover · Ctrl/⌘ + roda: zoom X · Shift + roda: zoom Y · duplo clique: reset.</p>
+      <p class="chart-help">Arraste para mover · Ctrl/⌘ + roda: zoom X · Shift + roda: zoom Y · C·Y: centralizar verticalmente · duplo clique: reset.</p>
     </article>
 
     <article class="card price-card">
@@ -166,6 +172,7 @@
             <button type="button" class="chart-tool" data-chart="win" data-action="right" title="Avançar no histórico">→</button>
             <button type="button" class="chart-tool" data-chart="win" data-action="up" title="Mover escala para cima">↑</button>
             <button type="button" class="chart-tool" data-chart="win" data-action="down" title="Mover escala para baixo">↓</button>
+            <button type="button" class="chart-tool ghost center-y" data-chart="win" data-action="center-y" title="Centralizar preço verticalmente mantendo o zoom Y">C·Y</button>
             <button type="button" class="chart-tool ghost" data-chart="win" data-action="latest" title="Ir ao candle mais recente">▸|</button>
             <button type="button" class="chart-tool ghost" data-chart="win" data-action="reset" title="Restaurar zoom e posição">↺</button>
           </div>
@@ -173,7 +180,7 @@
         <span class="chart-view-status chart-view-status-overlay" id="winViewStatus"></span>
         <div class="chart price-chart" id="chartWin"></div>
       </div>
-      <p class="chart-help">Arraste para mover · Ctrl/⌘ + roda: zoom X · Shift + roda: zoom Y · duplo clique: reset.</p>
+      <p class="chart-help">Arraste para mover · Ctrl/⌘ + roda: zoom X · Shift + roda: zoom Y · C·Y: centralizar verticalmente · duplo clique: reset.</p>
     </article>
   </section>
 

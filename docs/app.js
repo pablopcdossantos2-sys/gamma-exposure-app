@@ -247,6 +247,7 @@ function adjustChartView(key,action){
   else if(action==="y-out")v.yZoom=Math.max(.4,v.yZoom/1.3);
   else if(action==="up")v.yPan=clamp(v.yPan+.14/v.yZoom,-5,5);
   else if(action==="down")v.yPan=clamp(v.yPan-.14/v.yZoom,-5,5);
+  else if(action==="center-y")v.yPan=0;
   else if(action==="latest")v.end=total;
   else if(action==="reset"){resetChartView(key);v=state.chartViews[key]}
   if(v.count>total)v.count=total;
@@ -284,10 +285,12 @@ function priceChart(id,key,mapper,legendId){
   if(bars.length<2){host.innerHTML='<p class="note">Poucos candles para desenhar o gráfico.</p>';return}
   var showLevels=state.viewMode!=="intensity",showZones=state.viewMode!=="levels";
   var last=bars[bars.length-1].c,zones=showZones?gammaZones(mapper):[],keys=showLevels?levelRows().filter(function(r){return r.v!=null}).map(function(r){return{name:r.name,v:mapper(r.v),color:r.color}}):[];
-  var relevant=keys.filter(function(k){return k.v&&Math.abs(k.v/last-1)<=.25}),vals=[];
-  bars.forEach(function(b){vals.push(b.l,b.h)});relevant.forEach(function(k){vals.push(k.v)});zones.forEach(function(z){if(z.lo&&Math.abs(z.center/last-1)<=.25)vals.push(z.lo,z.hi)});
-  var baseMin=Math.min.apply(null,vals),baseMax=Math.max.apply(null,vals),basePad=(baseMax-baseMin)*.07||1;baseMin-=basePad;baseMax+=basePad;
-  var baseRange=Math.max(1e-9,baseMax-baseMin),baseMid=(baseMax+baseMin)/2,visibleRange=baseRange/view.yZoom,mid=baseMid+view.yPan*baseRange;
+  var relevant=keys.filter(function(k){return k.v&&Math.abs(k.v/last-1)<=.25}),priceVals=[];
+  bars.forEach(function(b){priceVals.push(b.l,b.h)});
+  var rawMin=Math.min.apply(null,priceVals),rawMax=Math.max.apply(null,priceVals),rawRange=Math.max(1e-9,rawMax-rawMin);
+  var minPad=key==="win"?10:.01,basePad=Math.max(rawRange*.025,minPad);
+  var baseMin=rawMin-basePad,baseMax=rawMax+basePad;
+  var baseRange=Math.max(1e-9,baseMax-baseMin),baseMid=(rawMax+rawMin)/2,visibleRange=baseRange/view.yZoom,mid=baseMid+view.yPan*baseRange;
   var ymin=mid-visibleRange/2,ymax=mid+visibleRange/2;
   var W=1220,H=440,m={l:72,r:125,t:22,b:46},plotW=W-m.l-m.r,plotH=H-m.t-m.b;
   var svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Gráfico de preço interativo com zonas de Gamma Exposure"},host);

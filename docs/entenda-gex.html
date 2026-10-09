@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entenda o GEX · Gamma Exposure</title>
+<meta name="description" content="Guia didático sobre Gamma Exposure, Gamma Flip, Call Wall, Put Wall e como interpretar o dashboard EWZ → WIN.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap guide-wrap">
+
+  <nav class="site-nav" aria-label="Navegação principal">
+    <a href="index.html">Dashboard</a>
+    <a class="active" href="entenda-gex.html">Entenda o GEX</a>
+  </nav>
+
+  <header class="guide-hero">
+    <p class="eyebrow">Guia didático</p>
+    <h1>Entenda o Gamma Exposure (GEX)</h1>
+    <p class="guide-lead">O GEX é uma forma de estimar onde a sensibilidade das posições em opções pode gerar necessidade de ajuste de hedge. Ele ajuda a pensar em <strong>regime de volatilidade</strong> e <strong>níveis estruturais</strong> — não em prever, sozinho, se o mercado vai subir ou cair.</p>
+  </header>
+
+  <section class="lesson-grid lesson-grid-3">
+    <article class="lesson-card">
+      <span class="lesson-step">1</span>
+      <h2>Comece pelo Delta</h2>
+      <p>Delta mede quanto o preço de uma opção tende a variar quando o ativo-objeto se move. Também é uma aproximação da exposição direcional da opção naquele instante.</p>
+    </article>
+    <article class="lesson-card">
+      <span class="lesson-step">2</span>
+      <h2>Depois, Gamma</h2>
+      <p>Gamma mede quanto o <strong>delta muda</strong> quando o preço do ativo muda. Quanto maior o gamma, mais rapidamente o hedge delta precisa ser reajustado.</p>
+    </article>
+    <article class="lesson-card">
+      <span class="lesson-step">3</span>
+      <h2>Então, GEX</h2>
+      <p>Gamma Exposure agrega essa sensibilidade usando gamma, open interest, multiplicador do contrato e preço do ativo. O resultado tenta estimar a relevância potencial dos ajustes de hedge.</p>
+    </article>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">A ideia central</p>
+    <h2>O que muda entre gamma positivo e negativo?</h2>
+    <div class="regime-compare">
+      <div class="regime-panel positive">
+        <strong>Gamma positivo</strong>
+        <div class="hedge-flow">
+          <span>Preço sobe</span><b>→</b><span>hedge tende a vender</span>
+          <span>Preço cai</span><b>→</b><span>hedge tende a comprar</span>
+        </div>
+        <p>Esse comportamento pode funcionar como força contrária ao movimento, favorecendo amortecimento, compressão de volatilidade e maior propensão à reversão à média.</p>
+      </div>
+      <div class="regime-panel negative">
+        <strong>Gamma negativo</strong>
+        <div class="hedge-flow">
+          <span>Preço sobe</span><b>→</b><span>hedge tende a comprar</span>
+          <span>Preço cai</span><b>→</b><span>hedge tende a vender</span>
+        </div>
+        <p>Esse comportamento pode reforçar o movimento, favorecendo expansão de volatilidade, aceleração e maior persistência de tendências.</p>
+      </div>
+    </div>
+    <div class="guide-callout"><strong>Importante:</strong> isso descreve um mecanismo potencial de hedge, não uma regra garantida. O posicionamento real dos dealers não é totalmente observável e diferentes modelos de GEX usam premissas diferentes.</div>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Mapa por strike</p>
+    <h2>Como ler o gráfico de Gamma Exposure</h2>
+    <div class="gex-demo" aria-label="Exemplo esquemático de GEX por strike">
+      <div class="gex-zero"></div>
+      <div class="gex-bar pos" style="--w:62%"><span>Call gamma</span></div>
+      <div class="gex-bar neg" style="--w:40%"><span>Put gamma</span></div>
+      <div class="gex-bar pos" style="--w:86%"><span>Maior concentração positiva</span></div>
+      <div class="gex-bar neg" style="--w:70%"><span>Maior concentração negativa</span></div>
+    </div>
+    <p class="guide-copy">No dashboard, cada strike do EWZ recebe uma estimativa de exposição. Barras positivas e negativas mostram onde a concentração de gamma é maior. Quanto maior o <code>|GEX|</code>, maior a relevância potencial daquele strike dentro do modelo.</p>
+  </section>
+
+  <section class="lesson-grid lesson-grid-2">
+    <article class="lesson-card accent-blue">
+      <h2>Call Wall</h2>
+      <p>É o strike com maior concentração de GEX de calls segundo nosso cálculo. Pode funcionar como uma região estrutural de resistência ou contenção, especialmente quando o preço se aproxima dela.</p>
+      <p class="lesson-note">Não significa que o preço “não pode” ultrapassar o nível.</p>
+    </article>
+    <article class="lesson-card accent-orange">
+      <h2>Put Wall</h2>
+      <p>É o strike com maior magnitude de GEX de puts. Pode funcionar como região estrutural de suporte ou contenção em movimentos de queda.</p>
+      <p class="lesson-note">Também não é uma barreira garantida.</p>
+    </article>
+    <article class="lesson-card accent-purple">
+      <h2>Gamma Flip</h2>
+      <p>É o preço teórico no qual o GEX agregado cruza zero. Ele separa dois regimes do modelo: de um lado, hedge potencialmente amortecedor; do outro, potencialmente amplificador.</p>
+    </article>
+    <article class="lesson-card accent-cyan">
+      <h2>Maior |GEX|</h2>
+      <p>É o strike com maior exposição líquida absoluta. Ele destaca onde a concentração estrutural é mais forte, independentemente de o sinal ser positivo ou negativo.</p>
+    </article>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Do EWZ para o WIN</p>
+    <h2>Por que projetamos os níveis no WIN?</h2>
+    <p class="guide-copy">As opções que estamos analisando pertencem ao <strong>EWZ</strong>. Como o objetivo operacional é observar o mini-índice brasileiro, o sistema cria uma projeção de referência usando preços coincidentes de EWZ e WIN:</p>
+    <div class="formula-box">
+      <code>razão = preço do WIN ÷ preço do EWZ</code>
+      <code>nível projetado no WIN = nível do EWZ × razão</code>
+    </div>
+    <p class="guide-copy">Essa transformação serve para transportar a <strong>posição relativa</strong> dos níveis para o gráfico do WIN. Ela não transforma EWZ e WIN em instrumentos economicamente equivalentes e pode sofrer efeito de câmbio, basis, horário e diferenças entre os dois mercados.</p>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Rotina prática</p>
+    <h2>Como usar o dashboard sem transformar GEX em “sinal mágico”</h2>
+    <ol class="guide-steps">
+      <li><strong>Escolha o snapshot.</strong> Para leitura pré/início de sessão, dê atenção especial ao snapshot marcado com ★, o mais próximo da abertura normal do WIN.</li>
+      <li><strong>Identifique o regime.</strong> Observe GEX líquido e Gamma Flip. A pergunta inicial é “o ambiente tende a amortecer ou ampliar movimentos?”.</li>
+      <li><strong>Mapeie os níveis.</strong> Localize Call Wall, Put Wall e strikes de maior |GEX|.</li>
+      <li><strong>Veja onde o preço está.</strong> Analise a distância do EWZ e do WIN projetado em relação a esses níveis.</li>
+      <li><strong>Compare ao fluxo e ao preço real.</strong> GEX deve ser contexto. Confirme comportamento, volume, agressão, liquidez, notícias e estrutura do dia.</li>
+      <li><strong>Compare snapshots.</strong> Mudanças intradiárias nas paredes e concentrações podem ser tão informativas quanto uma fotografia isolada.</li>
+    </ol>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Erros de interpretação</p>
+    <h2>O que o GEX não diz</h2>
+    <div class="myth-grid">
+      <div><strong>“GEX positivo = mercado vai subir.”</strong><span>Não. O sinal está mais ligado à dinâmica potencial de volatilidade e hedge do que à direção inicial.</span></div>
+      <div><strong>“Call Wall nunca rompe.”</strong><span>Não. É uma concentração relevante, não uma barreira física.</span></div>
+      <div><strong>“Open interest muda a cada negócio.”</strong><span>Não necessariamente. A base de OI costuma ser atualizada por sessão; parte da variação intradiária do GEX vem do preço, gamma e volatilidade.</span></div>
+      <div><strong>“Nosso GEX revela a carteira real dos dealers.”</strong><span>Não. É uma estimativa baseada em dados públicos e convenções de modelagem.</span></div>
+    </div>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Glossário rápido</p>
+    <div class="glossary">
+      <div><dt>Strike</dt><dd>Preço de exercício da opção.</dd></div>
+      <div><dt>Delta</dt><dd>Sensibilidade do preço da opção ao movimento do ativo.</dd></div>
+      <div><dt>Gamma</dt><dd>Taxa de mudança do delta quando o ativo se move.</dd></div>
+      <div><dt>Open Interest</dt><dd>Quantidade de contratos de opções em aberto.</dd></div>
+      <div><dt>Net GEX</dt><dd>Exposição gamma agregada conforme as premissas do modelo.</dd></div>
+      <div><dt>Snapshot</dt><dd>Fotografia da leitura do GEX em determinado horário de coleta.</dd></div>
+    </div>
+  </section>
+
+  <section class="card guide-section references">
+    <p class="section-kicker">Referências para aprofundamento</p>
+    <h2>Fontes conceituais</h2>
+    <p>Este guia foi escrito para explicar o modelo usado pela ferramenta e deve ser lido junto das limitações metodológicas. Para aprofundar:</p>
+    <ul>
+      <li><a href="https://www.cboe.com/insights/posts/volatility-insights-evaluating-the-market-impact-of-spx-0-dte-options/" target="_blank" rel="noopener">Cboe — Gamma hedging e impacto potencial sobre volatilidade</a></li>
+      <li><a href="https://support.spotgamma.com/hc/en-us/articles/15214161607827-GEX-Gamma-Exposure-Explained-What-It-Is-and-How-SpotGamma-Uses-It" target="_blank" rel="noopener">SpotGamma — visão geral de Gamma Exposure</a></li>
+      <li><a href="https://spotgamma.com/gamma-exposure-gex/" target="_blank" rel="noopener">SpotGamma — GEX, regimes e limitações do modelo</a></li>
+      <li><a href="https://github.com/pablopcdossantos2-sys/gamma-exposure-app/blob/main/CALCULO.md" target="_blank" rel="noopener">Metodologia de cálculo usada neste projeto</a></li>
+    </ul>
+  </section>
+
+  <p class="guide-disclaimer">Material educacional. GEX é uma ferramenta de contexto de mercado e não constitui recomendação de investimento.</p>
+</main>
+</body>
+</html>
