@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",chartViews:{ewz:null,win:null}};
+var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",chartViews:{ewz:null,win:null},compareA:null,compareB:null};
 var dragState=null,dragRAF=null;
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -41,6 +41,13 @@ function conversionRatio(){
   return win?win/ewz:null
 }
 function toWin(v){var r=conversionRatio();return v==null||!r?null:Math.round(v*r/WIN_TICK)*WIN_TICK}
+function activeGex(){
+  if(!state.gex)return null;
+  if(state.expiryFilter==="all"||!Array.isArray(state.gex.expiry_profiles))return state.gex;
+  var p=state.gex.expiry_profiles.find(function(x){return x.expiration===state.expiryFilter});
+  if(!p)return state.gex;
+  return Object.assign({},state.gex,p,{expiry_profiles:state.gex.expiry_profiles,generated_at:state.gex.generated_at,symbol:state.gex.symbol,demo:state.gex.demo})
+}
 function niceTicks(min,max,n){var span=max-min||1,step=Math.pow(10,Math.floor(Math.log10(span/n))),err=span/n/step;step*=err>=7.5?10:err>=3.5?5:err>=1.5?2:1;var out=[],v=Math.ceil(min/step)*step;for(;v<=max+step*1e-6;v+=step)out.push(Math.abs(v)<step*1e-9?0:v);return out}
 function compact(v){var a=Math.abs(v),s=v<0?"−":"";if(a>=1e9)return s+fmt2.format(a/1e9)+" bi";if(a>=1e6)return s+fmt2.format(a/1e6)+" mi";if(a>=1e3)return s+fmt0.format(a/1e3)+" mil";return s+fmt0.format(a)}
 var tip=$("tip");
@@ -49,7 +56,7 @@ function hideTip(){tip.hidden=true}
 function legend(id,items){var box=$(id);box.innerHTML="";items.forEach(function(it){var s=document.createElement("span"),i=document.createElement("i");i.style.background=it.color;if(it.cls)i.className=it.cls;if(it.dash){i.className="dash";i.style.color=it.color} s.appendChild(i);s.appendChild(document.createTextNode(it.name));box.appendChild(s)})}
 
 function levelRows(){
-  var d=state.gex;
+  var d=activeGex();
   return[
     {name:"Call Wall",v:d.call_wall,color:cssVar("--blue"),note:"Maior GEX de calls; resistência/oferta potencial."},
     {name:"Gamma Flip",v:d.flip,color:cssVar("--purple"),note:"Divisor entre regime de gamma positivo e negativo."},
@@ -139,7 +146,7 @@ function selectLatestSnapshot(){
   resetChartView("ewz");resetChartView("win");renderAll()
 }
 function renderKpis(){
-  var d=state.gex,b=$("kpis");b.innerHTML="";
+  var d=activeGex(),b=$("kpis");b.innerHTML="";
   [
     ["EWZ / regime","US$ "+fmt2.format(d.spot),regime(d),cssVar("--text")],
     ["GEX líquido",usd(d.net_gex),d.n_contracts+" contratos",cssVar("--cyan")],
@@ -149,14 +156,14 @@ function renderKpis(){
   ].forEach(function(it){var k=document.createElement("div");k.className="kpi";var l=document.createElement("div");l.className="lab";var dot=document.createElement("i");dot.className="dot";dot.style.background=it[3];l.appendChild(dot);l.appendChild(document.createTextNode(it[0]));var big=document.createElement("div");big.className="big";big.textContent=it[1];var sm=document.createElement("div");sm.className="small";sm.textContent=it[2];k.appendChild(l);k.appendChild(big);k.appendChild(sm);b.appendChild(k)})
 }
 function renderTable(){
-  var d=state.gex,t=document.querySelector("#levelsTable tbody");t.innerHTML="";
+  var d=activeGex(),t=document.querySelector("#levelsTable tbody");t.innerHTML="";
   levelRows().forEach(function(r){var tr=document.createElement("tr"),dist=r.v==null?"—":r.name==="Preço EWZ do GEX"?"—":fmtPct.format((r.v/d.spot-1)*100)+"%";[
     r.name,r.v==null?"—":"US$ "+fmt2.format(r.v),toWin(r.v)==null?"—":fmt0.format(toWin(r.v)),dist,r.note
   ].forEach(function(v,i){var td=document.createElement("td");if(i===1||i===2||i===3)td.className="num";if(i===0){var dot=document.createElement("i");dot.className="dot";dot.style.background=r.color;dot.style.marginRight="7px";td.appendChild(dot)}td.appendChild(document.createTextNode(v));tr.appendChild(td)});t.appendChild(tr)})
 }
 
 function chartGex(){
-  var d=state.gex,host=$("chartGex");host.innerHTML="";
+  var d=activeGex(),host=$("chartGex");host.innerHTML="";
   var lo=d.spot*(1-state.range),hi=d.spot*(1+state.range),rows=d.strikes.filter(function(s){return s.k>=lo&&s.k<=hi});
   if(!rows.length){host.textContent="Sem strikes nessa faixa.";return}
   var W=1220,H=410,m={l:76,r:22,t:32,b:55},svg=svgEl("svg",{viewBox:"0 0 "+W+" "+H,role:"img","aria-label":"Gamma Exposure por strike"},host);
@@ -181,7 +188,7 @@ function chartGex(){
 }
 
 function gammaZones(mapper){
-  var d=state.gex,rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
+  var d=activeGex(),rows=d.strikes.slice().sort(function(a,b){return a.k-b.k}),gap=Infinity;
   for(var i=1;i<rows.length;i++)gap=Math.min(gap,rows[i].k-rows[i-1].k);if(!isFinite(gap))gap=.5;
   var candidates=rows.filter(function(r){return r.net!==0}).sort(function(a,b){return Math.abs(b.net)-Math.abs(a.net)}).slice(0,state.zoneCount);
   var max=candidates.length?Math.abs(candidates[0].net):1;
@@ -299,7 +306,7 @@ function priceChart(id,key,mapper,legendId){
   var x=function(i){return m.l+i/(bars.length-1)*plotW},y=function(v){return m.t+(1-(v-ymin)/(ymax-ymin))*plotH};
   niceTicks(ymin,ymax,6).forEach(function(t){svgEl("line",{x1:m.l,x2:W-m.r,y1:y(t),y2:y(t),class:"grid"},svg);svgText(svg,m.l-8,y(t)+4,key==="win"?fmt0.format(t):fmt2.format(t),{"text-anchor":"end"})});
   if(showLevels){
-    var flip=state.gex.flip==null?null:mapper(state.gex.flip);
+    var gd=activeGex(),flip=gd.flip==null?null:mapper(gd.flip);
     if(flip!=null&&flip>ymin&&flip<ymax){
       var fy=y(flip);svgEl("rect",{x:m.l,y:m.t,width:plotW,height:Math.max(0,fy-m.t),fill:cssVar("--green"),"fill-opacity":.035},plot);
       svgEl("rect",{x:m.l,y:fy,width:plotW,height:Math.max(0,H-m.b-fy),fill:cssVar("--red"),"fill-opacity":.035},plot)
