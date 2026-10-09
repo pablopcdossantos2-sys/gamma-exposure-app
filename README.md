@@ -1,56 +1,80 @@
-# GEX do EWZ → WIN
+# Gamma Exposure · EWZ → WIN
 
-Site estático (GitHub Pages) que mostra o **Gamma Exposure do EWZ** — Gamma Flip, Call Wall, Put Wall — e converte os níveis para **pontos do WIN**. Um workflow do GitHub Actions coleta os dados do CBOE (grátis, ~15 min de atraso) em horário de pregão, salva tudo no repositório e republica o site.
+GitHub Page para visualizar o **Gamma Exposure (GEX) do EWZ** e projetar os níveis derivados das opções nos gráficos de preço do **EWZ** e do **mini-índice WIN1!**.
+
+## O que a página mostra
+
+A interface é centrada em três gráficos:
+
+1. **Gamma Exposure por strike**, com GEX de calls, puts e líquido, além de Gamma Flip, Call Wall, Put Wall e preço do EWZ.
+2. **EWZ em candles de 5 minutos**, com as principais zonas de GEX sobrepostas ao preço.
+3. **WIN1! em candles de 5 minutos**, com as zonas do EWZ convertidas automaticamente para pontos do WIN.
+
+A conversão usa:
 
 ```
-collector/        coleta e cálculo (Python, só precisa de "requests")
-docs/             o site (index.html, app.js, style.css) + docs/data/*.json
-data/raw/         respostas ORIGINAIS do CBOE (.json.gz), sem alteração
-.github/workflows/collect-and-deploy.yml
-CALCULO.md        explicação detalhada do cálculo
+razão = último WIN1! / último EWZ
+nível WIN = nível EWZ × razão
 ```
 
-## Publicar (uma vez)
+O valor é arredondado ao múltiplo de 5 mais próximo. A página também permite um ajuste manual opcional do WIN.
 
-1. Crie um repositório no GitHub (pode ser público ou privado*) e envie esta pasta:
-   ```
-   git init -b main
-   git add .
-   git commit -m "GEX EWZ"
-   git remote add origin https://github.com/SEU_USUARIO/SEU_REPO.git
-   git push -u origin main
-   ```
-2. No repositório: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Aba **Actions → "Coletar GEX e publicar no Pages" → Run workflow** (deixe "Guardar a resposta original" marcado).
-4. Ao terminar, o endereço aparece no job e em Settings → Pages: `https://SEU_USUARIO.github.io/SEU_REPO/`.
+## Fontes
 
-\* GitHub Pages em repositório privado exige plano pago; no plano gratuito o repositório precisa ser público.
+- **Gamma Exposure:** chain de opções do CBOE, com cálculo próprio em `collector/gex_core.py`.
+- **Preço do EWZ:** `AMEX:EWZ`.
+- **Preço do WIN contínuo:** `BMFBOVESPA:WIN1!`.
+- Os candles são obtidos pelo feed público/anônimo do TradingView. Esse acesso é não oficial, pode ser atrasado e pode mudar; por isso a coleta de preços fica isolada em `collector/collect_prices.py`.
 
-Enquanto a primeira coleta real não rodar, o site mostra **dados de demonstração** (sintéticos, com aviso na tela).
+## Estrutura
 
-## Usar o site
+```
+collector/
+  collect.py          coleta a chain do CBOE
+  gex_core.py         calcula GEX, Gamma Flip e Walls
+  collect_prices.py   coleta candles de EWZ e WIN1!
+docs/
+  index.html
+  app.js
+  style.css
+  data/
+    latest.json       último GEX
+    history.json      histórico do GEX
+    prices.json       candles de EWZ e WIN1!
+data/raw/             respostas originais compactadas do CBOE
+.github/workflows/
+  collect-and-deploy.yml
+CALCULO.md
+```
 
-Informe o **preço do WIN** no campo do topo (no mesmo horário do dado do EWZ) e clique em *Converter*. O valor fica salvo só no seu navegador. Cada nível em EWZ é convertido por `nível × (WIN ÷ EWZ)` e arredondado a 5 pontos.
+## Atualização automática
 
-## Agenda e variáveis
+O GitHub Actions roda em dias úteis, aproximadamente a cada 15 minutos durante a janela que cobre o pregão brasileiro e o mercado americano. Ele:
 
-- Agenda: segunda a sexta, de hora em hora, 13:05–21:05 UTC (veja o `cron` no workflow). O GitHub pode atrasar execuções agendadas.
-- A resposta original do CBOE é guardada às 15h e 20h UTC e nas execuções manuais (para o repositório não crescer demais: ~100 KB comprimido por arquivo).
-- Em **Settings → Secrets and variables → Actions → Variables**, opcional: `GEX_SYMBOL` (padrão `EWZ`) e `GEX_MAX_DTE` (só vencimentos até N dias).
+1. coleta o GEX do EWZ;
+2. coleta candles de EWZ e WIN1!;
+3. atualiza os JSON em `docs/data/`;
+4. publica novamente a GitHub Page.
+
+Os commits automáticos de dados **não disparam outra execução**, evitando loops do workflow.
 
 ## Rodar localmente
 
 ```
 pip install -r collector/requirements.txt
-python collector/collect.py --save-raw          # coleta de verdade (precisa de acesso ao CBOE)
-python collector/make_demo.py                   # regenera os dados de demonstração
-python -m http.server 8000 --directory docs     # abra http://localhost:8000
+python collector/collect.py --save-raw
+python collector/collect_prices.py
+python -m http.server 8000 --directory docs
 ```
 
-Para recalcular a partir de uma resposta guardada: `python collector/collect.py --from-raw data/raw/EWZ_AAAAMMDD_HHMMSS.json.gz`.
+Depois abra `http://localhost:8000`.
 
-## Pontos de atenção
+## Limitações
 
-- **Não testei contra o CBOE real** (o ambiente onde o projeto foi escrito não alcança o domínio). Se a coleta falhar no Actions, o log mostra o motivo e o site continua publicado com os últimos dados. Há relatos de que opções de ETF podem não estar no endpoint gratuito; se for o caso, troque `GEX_SYMBOL` para um índice (ex.: `SPX`) ou me peça o plano B.
-- O open interest atualiza uma vez por dia; os níveis intradiários mudam por causa do preço, não de novas posições.
-- GEX assume calls (+) e puts (−) — é um modelo, não a posição real dos dealers. Informação de mercado, não recomendação.
+- O CBOE e o feed público de preços podem ter atraso.
+- Open interest não é uma medida intradiária contínua; normalmente é atualizado uma vez por sessão.
+- A transformação EWZ → WIN é uma **projeção de referência**, não uma equivalência econômica perfeita entre os ativos.
+- GEX é um modelo de posicionamento/hedge e não revela diretamente a carteira real dos dealers.
+- O feed websocket do TradingView usado para candles não é uma API oficial pública e pode exigir manutenção futura.
+
+Conteúdo para estudo de mercado; não constitui recomendação de investimento.
