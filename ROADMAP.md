@@ -11,7 +11,7 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 - intensidade visual proporcional a `|GEX|`;
 - tooltip com GEX líquido, calls, puts e DTE;
 - destaque da coluna do vencimento atualmente filtrado;
-- funciona com os novos snapshots que preservam decomposição por expiry.
+- novos snapshots preservam decomposição por expiry.
 
 ### A2 — Comparação de snapshots
 **Status:** implementado.
@@ -22,16 +22,45 @@ Este roadmap mantém o escopo principal em **EWZ + WINFUT** e prioriza dados gra
 - barras de diferença `B − A` por strike;
 - troca rápida A ↔ B.
 
+### A3 — Mapa temporal Time × Strike
+**Status:** implementado.
+
+- heatmap intradiário com horário no eixo X e strike no eixo Y;
+- sinal e intensidade do GEX líquido por célula;
+- destaque do snapshot mais próximo da abertura do WIN;
+- Call Wall e Put Wall destacados dentro da matriz;
+- aplica o filtro global de vencimento quando os snapshots possuem detalhe por expiry.
+
+### A4 — Max Pain + Expected Move
+**Status:** implementado.
+
+- Max Pain calculado por vencimento;
+- Expected Move preferencialmente pelo straddle ATM: mid call + mid put;
+- fallback por IV ATM e `sqrt(T)`;
+- faixa esperada no EWZ e projeção para WIN;
+- Max Pain e limites do Expected Move aparecem como níveis nos gráficos de preço;
+- em “Todos os vencimentos”, usa explicitamente o expiry mais próximo.
+
 ### A5 — Filtros por vencimento
 **Status:** implementado.
 
 - opção “Todos os vencimentos”;
 - seleção de expiry individual;
-- KPIs, Walls, Flip, gráfico por strike e overlays de EWZ/WIN passam a usar o expiry escolhido;
+- KPIs, Walls, Flip, gráfico por strike e overlays de EWZ/WIN seguem a seleção;
 - snapshots legados continuam funcionando em modo agregado.
 
+### B1 — DEX + Vanna + Charm
+**Status:** implementado.
 
-#---
+- DEX, Vanna Exposure e Charm Exposure por strike;
+- totais agregados e por vencimento;
+- gráfico selecionável por métrica;
+- overlay opcional dos três strikes de maior magnitude nos gráficos EWZ/WIN;
+- convenção de dealer proxy documentada separadamente da convenção de sinal do GEX.
+
+---
+
+# Próximos blocos — dados gratuitos
 
 ## B2 — IV Skew + Term Structure
 **Prioridade:** alta.
@@ -42,7 +71,7 @@ Adicionar:
 - IV ATM por vencimento;
 - term structure;
 - comparação histórica;
-- sinalização de contango/backwardation de volatilidade como descrição, não previsão.
+- descrição de contango/backwardation de volatilidade sem linguagem preditiva.
 
 ## B3 — Stress Lab / Market Wind Tunnel
 **Prioridade:** alta.
@@ -79,7 +108,7 @@ Comparar OI entre dias:
 - alteração por strike/expiry;
 - mudança nas Walls associada ao novo inventário.
 
-Priorizar comparação diária, já que OI não é uma variável intradiária continuamente atualizada.
+Priorizar comparação diária, pois OI não é uma variável intradiária continuamente atualizada.
 
 ## B6 — Volume anômalo por contrato
 **Prioridade:** média.
@@ -139,7 +168,7 @@ Mostrar explicitamente:
 
 Adicionar filtro de Kalman ou suavização semelhante para a série temporal de Net GEX.
 
-**Regra:** sempre mostrar ou permitir consultar o valor bruto; o filtro nunca substitui silenciosamente o dado original.
+**Regra:** sempre permitir consultar o valor bruto; o filtro nunca substitui silenciosamente o dado original.
 
 ## C4 — Contexto automático em linguagem simples
 **Prioridade:** média.
