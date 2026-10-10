@@ -175,7 +175,7 @@ def archive_snapshot(latest, outdir, now):
 
     snap = dict(latest)
     snap.pop("curve", None)
-    snap["snapshot_version"] = 7
+    snap["snapshot_version"] = latest.get("snapshot_version", 8)
     snap["snapshot_timezone"] = "America/Sao_Paulo"
 
     rel_file = f"data/gex-snapshots/{day}/{hhmmss}.json"
