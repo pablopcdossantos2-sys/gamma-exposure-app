@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TradingView · Gamma Exposure</title>
+<meta name="description" content="Integração do Gamma Exposure com TradingView: gere o bloco EWZGEX2 e use indicadores Pine para EWZ e WIN.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap guide-wrap">
+
+  <nav class="site-nav" aria-label="Navegação principal">
+    <a href="index.html">Dashboard</a>
+    <a href="entenda-gex.html">Entenda o GEX</a>
+    <a class="active" href="tradingview.html">TradingView</a>
+    <a href="execucao-local.html">Executar localmente</a>
+  </nav>
+
+  <header class="guide-hero">
+    <p class="eyebrow">Integração TradingView</p>
+    <h1>Leve os níveis do Gamma Exposure para o seu gráfico</h1>
+    <p class="guide-lead">Escolha o snapshot e o vencimento, copie um único bloco <strong>EWZGEX2</strong> e cole nas configurações do indicador Pine. O mesmo bloco funciona no indicador do EWZ e no indicador do WIN.</p>
+  </header>
+
+  <section class="card guide-section" data-help="tv-review">
+    <p class="section-kicker">Análise dos indicadores de referência</p>
+    <h2>O que aproveitamos e o que precisou mudar</h2>
+    <div class="tv-review-grid">
+      <div>
+        <strong>O que os anexos já faziam bem</strong>
+        <ul>
+          <li>entrada por bloco de texto;</li>
+          <li>fallback manual;</li>
+          <li>linhas horizontais, rótulos e painel;</li>
+          <li>alertas de proximidade e cruzamento;</li>
+          <li>opção de mostrar somente barras recentes.</li>
+        </ul>
+      </div>
+      <div>
+        <strong>Por que não podiam ser usados sem adaptação</strong>
+        <ul>
+          <li>esperavam “Call Wall 2”, “Gamma resistência/suporte” e outros níveis que nosso modelo não calcula com essas definições;</li>
+          <li>o indicador WIN refazia a projeção internamente, podendo divergir dos valores exibidos pelo nosso dashboard;</li>
+          <li>Max Pain, Expected Move e maior |GEX| do nosso sistema não estavam contemplados.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="guide-callout"><strong>Solução:</strong> os indicadores V2 usam somente níveis realmente calculados pelo Gamma Exposure e o WIN recebe os valores já projetados pela própria aplicação.</p>
+  </section>
+
+  <section class="card tv-generator-card" data-help="tv-generator">
+    <div class="card-head">
+      <div>
+        <p class="section-kicker">Gerador</p>
+        <h2>Bloco EWZGEX2 pronto para colar</h2>
+        <p class="note">Os valores abaixo acompanham o snapshot e o vencimento selecionados. “Todos os vencimentos” usa a cadeia agregada para Walls/Flip e o vencimento estrutural mais próximo para Max Pain/Expected Move.</p>
+      </div>
+      <button type="button" class="ghost" id="tvLatestBtn">Mais recente</button>
+    </div>
+
+    <div class="tv-controls">
+      <label>Dia
+        <select id="tvDateSelect"></select>
+      </label>
+      <label>Horário
+        <select id="tvTimeSelect"></select>
+      </label>
+      <label>Vencimento
+        <select id="tvExpirySelect"><option value="all">Todos os vencimentos</option></select>
+      </label>
+      <label>WIN de referência manual <span>(opcional)</span>
+        <input id="tvWinManual" inputmode="decimal" placeholder="ex.: 208000">
+      </label>
+    </div>
+
+    <div class="tv-generator-status" id="tvGeneratorStatus">Carregando dados…</div>
+
+    <div class="table-scroll">
+      <table id="tvLevelsTable">
+        <thead>
+          <tr>
+            <th>Nível</th>
+            <th class="num">EWZ</th>
+            <th class="num">WIN exportado</th>
+            <th>Origem</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <label class="tv-block-label" for="tvExportBlock">Bloco gerado</label>
+    <textarea id="tvExportBlock" class="tv-export-block" readonly spellcheck="false"></textarea>
+    <div class="tv-copy-actions">
+      <button type="button" id="tvCopyBtn">Copiar bloco EWZGEX2</button>
+      <span id="tvCopyStatus" role="status"></span>
+    </div>
+  </section>
+
+  <section class="card guide-section" data-help="tv-indicators">
+    <p class="section-kicker">Indicadores Pine Script v6</p>
+    <h2>Escolha o gráfico onde deseja plotar os níveis</h2>
+    <div class="tv-indicator-grid">
+      <article class="lesson-card">
+        <h2>EWZ GEX Levels · Export V2</h2>
+        <p>Plota diretamente no gráfico do EWZ: Spot, Call Wall, Put Wall, Gamma Flip, maior |GEX|, Max Pain e Expected Move ±.</p>
+        <a class="tv-download" href="tradingview/EWZ_GEX_EWZ_V2.pine" download>Baixar indicador EWZ (.pine)</a>
+      </article>
+      <article class="lesson-card">
+        <h2>EWZ GEX → WIN · Export V2</h2>
+        <p>Plota no WIN os mesmos níveis já convertidos pelo nosso sistema. O Pine não recalcula a razão EWZ→WIN.</p>
+        <a class="tv-download" href="tradingview/EWZ_GEX_WIN_V2.pine" download>Baixar indicador WIN (.pine)</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="card guide-section" data-help="tv-install">
+    <p class="section-kicker">Instalação</p>
+    <h2>Como usar no TradingView</h2>
+    <ol class="guide-list">
+      <li>Baixe o arquivo <code>.pine</code> correspondente ao gráfico desejado.</li>
+      <li>Abra o TradingView e entre no <strong>Editor Pine</strong>.</li>
+      <li>Abra o arquivo como texto, copie todo o código e cole no Editor Pine.</li>
+      <li>Salve o script e clique em <strong>Adicionar ao gráfico</strong>.</li>
+      <li>Volte a esta página, escolha o snapshot/vencimento e clique em <strong>Copiar bloco EWZGEX2</strong>.</li>
+      <li>No TradingView, abra <strong>Configurações → Inputs</strong> do indicador.</li>
+      <li>Cole o bloco inteiro no campo <strong>Bloco EWZGEX2</strong>.</li>
+      <li>Confirme. As linhas, rótulos e painel serão atualizados.</li>
+    </ol>
+    <p class="guide-callout"><strong>Importante:</strong> cole o bloco nas configurações do indicador, e não dentro do código Pine.</p>
+  </section>
+
+  <section class="card guide-section" data-help="tv-format">
+    <p class="section-kicker">Contrato de dados</p>
+    <h2>O que existe dentro do EWZGEX2?</h2>
+    <p>O bloco é uma linha compacta com pares <code>chave=valor</code> separados por <code>|</code>. Ele registra snapshot, escopo, vencimento estrutural, níveis EWZ, razão de conversão e os níveis WIN já arredondados ao tick de 5 pontos.</p>
+    <pre><code>EWZGEX2|ts=...|scope=all|spot=...|cw=...|pw=...|flip=...|maxg=...|pain=...|emlo=...|emhi=...|ratio=...|wcw=...|wpw=...</code></pre>
+    <p>Valores indisponíveis são exportados como <code>0</code> e não são plotados pelo indicador.</p>
+  </section>
+
+  <section class="card guide-section">
+    <p class="section-kicker">Limitações</p>
+    <h2>O TradingView não recebe atualizações sozinho</h2>
+    <p>O Pine Script não acessa diretamente os JSON do GitHub Pages. Quando desejar atualizar os níveis, gere um novo bloco nesta página e cole novamente nas configurações do indicador.</p>
+    <p>Os dados continuam sujeitos às mesmas limitações do dashboard: chain pública delayed do CBOE e projeção EWZ→WIN como referência, não equivalência econômica perfeita.</p>
+  </section>
+
+</main>
+<script src="help.js"></script>
+<script src="tradingview.js"></script>
+</body>
+</html>
