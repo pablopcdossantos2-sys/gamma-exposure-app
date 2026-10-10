@@ -189,3 +189,5 @@ alertcondition(ta.cross(close, lPutWall), "EWZ cruzou Put Wall", "O EWZ cruzou a
 alertcondition(ta.cross(close, lFlip), "EWZ cruzou Gamma Flip", "O EWZ cruzou o Gamma Flip exportado.")
 alertcondition(ta.cross(close, lMaxGex), "EWZ cruzou maior |GEX|", "O EWZ cruzou o strike de maior |GEX| exportado.")
 alertcondition(ta.cross(close, lMaxPain), "EWZ cruzou Max Pain", "O EWZ cruzou o Max Pain exportado.")
+alertcondition(ta.cross(close, lEmLow), "EWZ cruzou Expected Move −", "O EWZ cruzou o limite inferior do Expected Move exportado.")
+alertcondition(ta.cross(close, lEmHigh), "EWZ cruzou Expected Move +", "O EWZ cruzou o limite superior do Expected Move exportado.")
