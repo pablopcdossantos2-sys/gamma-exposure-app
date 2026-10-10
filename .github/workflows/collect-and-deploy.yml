@@ -30,6 +30,10 @@ on:
       - "executar-localmente.sh"
       - "Tutorial-Execucao-Local-Windows.md"
       - "docs/execucao-local.html"
+      - "docs/tradingview.html"
+      - "docs/tradingview.js"
+      - "docs/tradingview/**"
+      - "test_tradingview_assets.py"
 
 permissions:
   contents: write
@@ -57,8 +61,11 @@ jobs:
 
       - run: pip install -r collector/requirements.txt
 
-      - name: Testar núcleo analítico e execução local
-        run: python -m unittest collector.test_gex_core test_local_app
+      - name: Testar núcleo analítico, execução local e TradingView
+        run: python -m unittest collector.test_gex_core test_local_app test_tradingview_assets
+
+      - name: Validar JavaScript do gerador TradingView
+        run: node --check docs/tradingview.js
 
       - name: Coletar Gamma Exposure do EWZ (CBOE)
         id: collect_gex
