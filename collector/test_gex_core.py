@@ -1,12 +1,15 @@
 import math
+import json
 import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gex_core
 import collect
+import validate_snapshot
 
 
 class GexCoreTests(unittest.TestCase):
@@ -250,6 +253,61 @@ class GexSpecificationTests(unittest.TestCase):
         self.assertEqual(res["put_wall"], 42.0)
         expected_max_abs = max(res["strikes"], key=lambda r: abs(r["net"]))["k"]
         self.assertEqual(res["max_abs_strike"], expected_max_abs)
+
+
+class CollectionRobustnessTests(unittest.TestCase):
+    def test_failed_attempt_status_preserves_last_valid_metadata(self):
+        with tempfile.TemporaryDirectory() as td:
+            previous = {
+                "symbol": "EWZ",
+                "demo": False,
+                "generated_at": "2026-10-10T12:02:05Z",
+                "cboe_timestamp": "2026-10-10 12:01:45",
+                "spot": 43.12,
+                "net_gex": 123456,
+                "call_wall": 43.0,
+                "put_wall": 40.0,
+                "max_abs_strike": 43.0,
+                "strikes": [{"k": 43.0, "call": 200000, "put": -76544, "net": 123456}],
+            }
+            collect.write_json(os.path.join(td, "latest.json"), previous)
+            before = open(os.path.join(td, "latest.json"), encoding="utf-8").read()
+
+            status = collect.write_collection_status(
+                td,
+                "EWZ",
+                datetime(2026, 10, 10, 12, 17, tzinfo=timezone.utc),
+                "failed",
+                message="RuntimeError: fonte temporariamente indisponível",
+                last_valid=collect._last_valid_metadata(td),
+            )
+
+            after = open(os.path.join(td, "latest.json"), encoding="utf-8").read()
+            self.assertEqual(before, after)
+            self.assertEqual(status["status"], "failed")
+            self.assertFalse(status["latest_updated"])
+            self.assertEqual(status["last_valid_generated_at"], previous["generated_at"])
+            self.assertEqual(status["last_valid_spot"], previous["spot"])
+
+    def test_snapshot_validator_rejects_wrong_sign_and_net(self):
+        payload = {
+            "symbol": "EWZ",
+            "demo": False,
+            "generated_at": "2026-10-10T12:02:05Z",
+            "spot": 40.0,
+            "net_gex": 100,
+            "call_wall": 40.0,
+            "put_wall": 40.0,
+            "max_abs_strike": 40.0,
+            "strikes": [{"k": 40.0, "call": -10, "put": 5, "net": 100}],
+            "quality": {"contracts_used": 1, "strikes": 1},
+        }
+        errors = validate_snapshot.validate_payload(payload)
+        joined = " | ".join(errors)
+        self.assertIn("Call GEX negativo", joined)
+        self.assertIn("Put GEX positivo", joined)
+        self.assertIn("net != call + put", joined)
+
 
 
 if __name__ == "__main__":
