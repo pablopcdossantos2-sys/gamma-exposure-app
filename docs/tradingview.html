@@ -20,7 +20,7 @@
   <header class="guide-hero">
     <p class="eyebrow">Integração TradingView</p>
     <h1>Leve os níveis do Gamma Exposure para o seu gráfico</h1>
-    <p class="guide-lead">Escolha o snapshot e o vencimento, copie um único bloco <strong>EWZGEX2</strong> e cole nas configurações do indicador Pine. O mesmo bloco funciona no indicador do EWZ e no indicador do WIN.</p>
+    <p class="guide-lead">Escolha o snapshot e o vencimento, copie um único bloco <strong>EWZGEX2</strong> e cole nas configurações do indicador universal. O mesmo indicador detecta automaticamente se o gráfico é EWZ ou WIN e seleciona os níveis corretos.</p>
   </header>
 
   <section class="card guide-section" data-help="tv-review">
@@ -46,7 +46,7 @@
         </ul>
       </div>
     </div>
-    <p class="guide-callout"><strong>Solução:</strong> os indicadores V2 usam somente níveis realmente calculados pelo Gamma Exposure e o WIN recebe os valores já projetados pela própria aplicação.</p>
+    <p class="guide-callout"><strong>Solução:</strong> o indicador universal usa somente níveis realmente calculados pelo Gamma Exposure. O bloco EWZGEX2 já contém simultaneamente os níveis EWZ e os níveis WIN projetados pela aplicação.</p>
   </section>
 
   <section class="card tv-generator-card" data-help="tv-generator">
@@ -99,27 +99,50 @@
   </section>
 
   <section class="card guide-section" data-help="tv-indicators">
-    <p class="section-kicker">Indicadores Pine Script v6</p>
-    <h2>Escolha o gráfico onde deseja plotar os níveis</h2>
-    <div class="tv-indicator-grid">
-      <article class="lesson-card">
-        <h2>EWZ GEX Levels · Export V2</h2>
-        <p>Plota diretamente no gráfico do EWZ: Spot, Call Wall, Put Wall, Gamma Flip, maior |GEX|, Max Pain e Expected Move ±.</p>
-        <a class="tv-download" href="tradingview/EWZ_GEX_EWZ_V2.pine" download>Baixar indicador EWZ (.pine)</a>
-      </article>
-      <article class="lesson-card">
-        <h2>EWZ GEX → WIN · Export V2</h2>
-        <p>Plota no WIN os mesmos níveis já convertidos pelo nosso sistema. O Pine não recalcula a razão EWZ→WIN.</p>
-        <a class="tv-download" href="tradingview/EWZ_GEX_WIN_V2.pine" download>Baixar indicador WIN (.pine)</a>
-      </article>
+    <p class="section-kicker">Indicador recomendado · Pine Script v6</p>
+    <h2>Um único indicador para EWZ e WIN</h2>
+
+    <article class="tv-universal-card">
+      <div>
+        <span class="tv-recommended-badge">Recomendado</span>
+        <h2>Gamma Exposure · EWZ ↔ WIN · Universal V2</h2>
+        <p>Use o mesmo indicador no layout do TradingView. Em modo <strong>Automático</strong>, ele identifica EWZ ou WIN pelo ticker/raiz do gráfico e escolhe sozinho o conjunto correto dentro do mesmo EWZGEX2.</p>
+        <p>Se o fornecedor usar uma nomenclatura incomum, o usuário pode escolher <strong>Forçar EWZ</strong> ou <strong>Forçar WIN</strong> nas configurações.</p>
+      </div>
+      <a class="tv-download tv-download-primary" href="tradingview/EWZ_GEX_UNIVERSAL_V2.pine" download>Baixar indicador universal (.pine)</a>
+    </article>
+
+    <div class="tv-universal-flow">
+      <span>1 indicador</span>
+      <b>+</b>
+      <span>1 bloco EWZGEX2</span>
+      <b>→</b>
+      <span>EWZ ou WIN automaticamente</span>
     </div>
+
+    <details class="tv-alternatives">
+      <summary>Indicadores separados — alternativas</summary>
+      <p class="note">Mantidos para diagnóstico, preferência pessoal ou caso o usuário queira scripts independentes.</p>
+      <div class="tv-indicator-grid">
+        <article class="lesson-card">
+          <h2>EWZ GEX Levels · Export V2</h2>
+          <p>Versão dedicada exclusivamente ao EWZ.</p>
+          <a class="tv-download" href="tradingview/EWZ_GEX_EWZ_V2.pine" download>Baixar indicador EWZ (.pine)</a>
+        </article>
+        <article class="lesson-card">
+          <h2>EWZ GEX → WIN · Export V2</h2>
+          <p>Versão dedicada exclusivamente ao WIN.</p>
+          <a class="tv-download" href="tradingview/EWZ_GEX_WIN_V2.pine" download>Baixar indicador WIN (.pine)</a>
+        </article>
+      </div>
+    </details>
   </section>
 
   <section class="card guide-section" data-help="tv-install">
     <p class="section-kicker">Instalação</p>
     <h2>Como usar no TradingView</h2>
     <ol class="guide-list">
-      <li>Baixe o arquivo <code>.pine</code> correspondente ao gráfico desejado.</li>
+      <li>Baixe <code>EWZ_GEX_UNIVERSAL_V2.pine</code>, o indicador recomendado.</li>
       <li>Abra o TradingView e entre no <strong>Editor Pine</strong>.</li>
       <li>Abra o arquivo como texto, copie todo o código e cole no Editor Pine.</li>
       <li>Salve o script e clique em <strong>Adicionar ao gráfico</strong>.</li>
@@ -127,8 +150,9 @@
       <li>No TradingView, abra <strong>Configurações → Inputs</strong> do indicador.</li>
       <li>Cole o bloco inteiro no campo <strong>Bloco EWZGEX2</strong>.</li>
       <li>Confirme. As linhas, rótulos e painel serão atualizados.</li>
+      <li>Depois disso, alterne normalmente entre EWZ e WIN no TradingView. Em modo Automático, o indicador troca os níveis sozinho.</li>
     </ol>
-    <p class="guide-callout"><strong>Importante:</strong> cole o bloco nas configurações do indicador, e não dentro do código Pine.</p>
+    <p class="guide-callout"><strong>Importante:</strong> cole o bloco nas configurações do indicador, e não dentro do código Pine. O mesmo bloco contém os dois ativos — não é necessário gerar ou colar um segundo bloco ao mudar de EWZ para WIN.</p>
   </section>
 
   <section class="card guide-section" data-help="tv-format">
