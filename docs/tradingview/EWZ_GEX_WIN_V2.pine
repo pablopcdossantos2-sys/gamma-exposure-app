@@ -213,3 +213,5 @@ alertcondition(ta.cross(close, lPutWall), "WIN cruzou Put Wall", "O WIN cruzou a
 alertcondition(ta.cross(close, lFlip), "WIN cruzou Gamma Flip", "O WIN cruzou o Gamma Flip projetado.")
 alertcondition(ta.cross(close, lMaxGex), "WIN cruzou maior |GEX|", "O WIN cruzou o nível de maior |GEX| projetado.")
 alertcondition(ta.cross(close, lMaxPain), "WIN cruzou Max Pain", "O WIN cruzou o Max Pain projetado.")
+alertcondition(ta.cross(close, lEmLow), "WIN cruzou Expected Move −", "O WIN cruzou o limite inferior do Expected Move projetado.")
+alertcondition(ta.cross(close, lEmHigh), "WIN cruzou Expected Move +", "O WIN cruzou o limite superior do Expected Move projetado.")
