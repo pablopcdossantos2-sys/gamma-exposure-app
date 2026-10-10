@@ -194,5 +194,63 @@ class GexCoreTests(unittest.TestCase):
         self.assertTrue(all("volume_gamma_net" in row for row in res["strikes"]))
 
 
+class GexSpecificationTests(unittest.TestCase):
+    def _c(self, cp, strike, gamma, oi):
+        return {
+            "cp": cp,
+            "strike": float(strike),
+            "dte": 10,
+            "expiration": "2026-10-20",
+            "t": 10 / 365,
+            "iv": 0.25,
+            "gamma": float(gamma),
+            "oi": float(oi),
+            "volume": 0.0,
+            "delta": 0.5 if cp == "C" else -0.5,
+            "bid": 1.0,
+            "ask": 1.1,
+            "last": 1.05,
+        }
+
+    def test_spec_formula_call_and_put_sign(self):
+        # Especificação: 0,05 × 1000 × 100 × 40² × 0,01 = 80.000
+        contracts = [
+            self._c("C", 40, 0.05, 1000),
+            self._c("P", 41, 0.05, 1000),
+        ]
+        by = gex_core.gex_by_strike(40.0, contracts)
+        self.assertAlmostEqual(by[40.0]["call"], 80000.0, places=6)
+        self.assertEqual(by[40.0]["put"], 0.0)
+        self.assertAlmostEqual(by[41.0]["put"], -80000.0, places=6)
+        self.assertEqual(by[41.0]["call"], 0.0)
+
+    def test_spec_aggregates_multiple_contracts_same_strike(self):
+        contracts = [
+            self._c("C", 40, 0.05, 1000),
+            self._c("C", 40, 0.025, 1000),
+            self._c("P", 40, 0.01, 1000),
+        ]
+        by = gex_core.gex_by_strike(40.0, contracts)
+        self.assertAlmostEqual(by[40.0]["call"], 120000.0, places=6)
+        self.assertAlmostEqual(by[40.0]["put"], -16000.0, places=6)
+        self.assertAlmostEqual(by[40.0]["call"] + by[40.0]["put"], 104000.0, places=6)
+
+    def test_spec_walls_max_abs_and_strike_order(self):
+        contracts = [
+            self._c("C", 42, 0.01, 1000),
+            self._c("P", 42, 0.04, 1000),
+            self._c("C", 40, 0.05, 1000),
+            self._c("P", 40, 0.01, 1000),
+            self._c("C", 41, 0.02, 1000),
+            self._c("P", 41, 0.02, 1000),
+        ]
+        res = gex_core.compute(40.0, contracts)
+        self.assertEqual([r["k"] for r in res["strikes"]], [40.0, 41.0, 42.0])
+        self.assertEqual(res["call_wall"], 40.0)
+        self.assertEqual(res["put_wall"], 42.0)
+        expected_max_abs = max(res["strikes"], key=lambda r: abs(r["net"]))["k"]
+        self.assertEqual(res["max_abs_strike"], expected_max_abs)
+
+
 if __name__ == "__main__":
     unittest.main()
