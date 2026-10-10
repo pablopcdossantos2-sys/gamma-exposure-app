@@ -1,0 +1,193 @@
+//@version=6
+indicator("EWZ GEX Levels · Export V2", overlay = true, max_labels_count = 100)
+
+// ============================================================================
+// 1) BLOCO GERADO PELO GAMMA EXPOSURE
+// ============================================================================
+groupBridge = "1. Gamma Exposure App"
+inputMode = input.string("Bloco EWZGEX2", "Origem dos níveis", options = ["Bloco EWZGEX2", "Manual"], group = groupBridge)
+appBlock = input.text_area("", "Bloco EWZGEX2", group = groupBridge, tooltip = "Cole aqui o bloco gerado pela página TradingView do Gamma Exposure. Não cole o bloco no código Pine.")
+
+bool blockOk = str.startswith(appBlock, "EWZGEX2|")
+
+f_blockFloat(string key, float fallback) =>
+    float out = fallback
+    if blockOk
+        parts = str.split(appBlock, "|")
+        for i = 0 to array.size(parts) - 1
+            token = array.get(parts, i)
+            kv = str.split(token, "=")
+            if array.size(kv) >= 2 and array.get(kv, 0) == key
+                parsed = str.tonumber(array.get(kv, 1))
+                if not na(parsed)
+                    out := parsed
+    out
+
+f_blockString(string key, string fallback) =>
+    string out = fallback
+    if blockOk
+        parts = str.split(appBlock, "|")
+        for i = 0 to array.size(parts) - 1
+            token = array.get(parts, i)
+            kv = str.split(token, "=")
+            if array.size(kv) >= 2 and array.get(kv, 0) == key
+                out := array.get(kv, 1)
+    out
+
+// ============================================================================
+// 2) FALLBACK MANUAL
+// ============================================================================
+groupManual = "2. Níveis manuais"
+spotManual = input.float(0.0, "Spot EWZ", minval = 0.0, step = 0.01, group = groupManual)
+callWallManual = input.float(0.0, "Call Wall", minval = 0.0, step = 0.01, group = groupManual)
+putWallManual = input.float(0.0, "Put Wall", minval = 0.0, step = 0.01, group = groupManual)
+flipManual = input.float(0.0, "Gamma Flip", minval = 0.0, step = 0.01, group = groupManual)
+maxGexManual = input.float(0.0, "Maior |GEX|", minval = 0.0, step = 0.01, group = groupManual)
+maxPainManual = input.float(0.0, "Max Pain", minval = 0.0, step = 0.01, group = groupManual)
+emLowManual = input.float(0.0, "Expected Move −", minval = 0.0, step = 0.01, group = groupManual)
+emHighManual = input.float(0.0, "Expected Move +", minval = 0.0, step = 0.01, group = groupManual)
+
+bool useBlock = inputMode == "Bloco EWZGEX2" and blockOk
+spot = useBlock ? f_blockFloat("spot", 0.0) : spotManual
+callWall = useBlock ? f_blockFloat("cw", 0.0) : callWallManual
+putWall = useBlock ? f_blockFloat("pw", 0.0) : putWallManual
+gammaFlip = useBlock ? f_blockFloat("flip", 0.0) : flipManual
+maxGex = useBlock ? f_blockFloat("maxg", 0.0) : maxGexManual
+maxPain = useBlock ? f_blockFloat("pain", 0.0) : maxPainManual
+emLow = useBlock ? f_blockFloat("emlo", 0.0) : emLowManual
+emHigh = useBlock ? f_blockFloat("emhi", 0.0) : emHighManual
+
+snapshotText = useBlock ? f_blockString("ts", "—") : "manual"
+scopeText = useBlock ? f_blockString("scope", "—") : "manual"
+structureExpiryText = useBlock ? f_blockString("structexp", "—") : "manual"
+
+// ============================================================================
+// 3) VISUAL
+// ============================================================================
+groupVisual = "3. Visual"
+showSpot = input.bool(true, "Spot do snapshot", group = groupVisual)
+showCallWall = input.bool(true, "Call Wall", group = groupVisual)
+showPutWall = input.bool(true, "Put Wall", group = groupVisual)
+showFlip = input.bool(true, "Gamma Flip", group = groupVisual)
+showMaxGex = input.bool(true, "Maior |GEX|", group = groupVisual)
+showMaxPain = input.bool(true, "Max Pain", group = groupVisual)
+showExpectedMove = input.bool(true, "Expected Move ±", group = groupVisual)
+showLabels = input.bool(true, "Mostrar rótulos", group = groupVisual)
+showTable = input.bool(true, "Mostrar painel", group = groupVisual)
+labelOffset = input.int(2, "Deslocamento dos rótulos", minval = 0, maxval = 50, group = groupVisual)
+recentOnly = input.bool(true, "Exibir somente barras recentes", group = groupVisual, tooltip = "Evita a impressão de que os níveis do snapshot atual existiam em todo o histórico.")
+recentDays = input.int(3, "Dias corridos exibidos", minval = 1, maxval = 30, group = groupVisual)
+
+bool inWindow = not recentOnly or time >= timenow - recentDays * 24 * 60 * 60 * 1000
+f_valid(float x) => not na(x) and x > 0
+f_level(bool enabled, float x) => enabled and inWindow and f_valid(x) ? x : na
+
+lSpot = f_level(showSpot, spot)
+lCallWall = f_level(showCallWall, callWall)
+lPutWall = f_level(showPutWall, putWall)
+lFlip = f_level(showFlip, gammaFlip)
+lMaxGex = f_level(showMaxGex, maxGex)
+lMaxPain = f_level(showMaxPain, maxPain)
+lEmLow = f_level(showExpectedMove, emLow)
+lEmHigh = f_level(showExpectedMove, emHigh)
+
+plot(lSpot, "EWZ · Spot do snapshot", color = color.new(color.gray, 20), linewidth = 1, style = plot.style_linebr)
+plot(lCallWall, "EWZ · Call Wall", color = color.orange, linewidth = 3, style = plot.style_linebr)
+plot(lPutWall, "EWZ · Put Wall", color = color.green, linewidth = 3, style = plot.style_linebr)
+plot(lFlip, "EWZ · Gamma Flip", color = color.yellow, linewidth = 3, style = plot.style_linebr)
+plot(lMaxGex, "EWZ · Maior |GEX|", color = color.aqua, linewidth = 2, style = plot.style_linebr)
+plot(lMaxPain, "EWZ · Max Pain", color = color.fuchsia, linewidth = 2, style = plot.style_linebr)
+plot(lEmLow, "EWZ · Expected Move −", color = color.new(color.blue, 25), linewidth = 2, style = plot.style_linebr)
+plot(lEmHigh, "EWZ · Expected Move +", color = color.new(color.blue, 25), linewidth = 2, style = plot.style_linebr)
+
+chartIsEwz = str.upper(syminfo.ticker) == "EWZ"
+bgcolor(not chartIsEwz ? color.new(color.orange, 92) : na, title = "Aviso: gráfico diferente de EWZ")
+
+// ============================================================================
+// 4) RÓTULOS
+// ============================================================================
+f_label(label id, float y, string name, color c) =>
+    label out = id
+    if barstate.islast
+        if showLabels and not na(y)
+            string txt = name + " · " + str.tostring(y, format.mintick)
+            if na(out)
+                out := label.new(bar_index + labelOffset, y, txt, xloc = xloc.bar_index, style = label.style_label_left, color = color.new(c, 10), textcolor = color.white, size = size.small)
+            else
+                label.set_xy(out, bar_index + labelOffset, y)
+                label.set_text(out, txt)
+                label.set_color(out, color.new(c, 10))
+                label.set_textcolor(out, color.white)
+        else
+            if not na(out)
+                label.delete(out)
+            out := na
+    out
+
+var label lbSpot = na
+var label lbCw = na
+var label lbPw = na
+var label lbFlip = na
+var label lbMax = na
+var label lbPain = na
+var label lbLo = na
+var label lbHi = na
+
+lbSpot := f_label(lbSpot, lSpot, "Spot", color.gray)
+lbCw := f_label(lbCw, lCallWall, "Call Wall", color.orange)
+lbPw := f_label(lbPw, lPutWall, "Put Wall", color.green)
+lbFlip := f_label(lbFlip, lFlip, "Gamma Flip", color.yellow)
+lbMax := f_label(lbMax, lMaxGex, "Maior |GEX|", color.aqua)
+lbPain := f_label(lbPain, lMaxPain, "Max Pain", color.fuchsia)
+lbLo := f_label(lbLo, lEmLow, "Expected Move −", color.blue)
+lbHi := f_label(lbHi, lEmHigh, "Expected Move +", color.blue)
+
+// ============================================================================
+// 5) PAINEL
+// ============================================================================
+f_fmt(float x) => f_valid(x) ? str.tostring(x, "#.##") : "—"
+f_dist(float x) => f_valid(x) ? str.tostring((close / x - 1.0) * 100.0, "#.##") + "%" : "—"
+
+var table panel = table.new(position.top_right, 3, 11, border_width = 1)
+f_row(int row, string name, float level, color c) =>
+    table.cell(panel, 0, row, name, text_color = c)
+    table.cell(panel, 1, row, f_fmt(level))
+    table.cell(panel, 2, row, f_dist(level))
+
+if barstate.islast
+    table.clear(panel, 0, 0, 2, 10)
+    if showTable
+        table.cell(panel, 0, 0, "EWZGEX2")
+        table.cell(panel, 1, 0, blockOk ? "OK" : "manual")
+        table.cell(panel, 2, 0, scopeText)
+        table.cell(panel, 0, 1, "Snapshot")
+        table.cell(panel, 1, 1, snapshotText)
+        table.cell(panel, 2, 1, structureExpiryText)
+        table.cell(panel, 0, 2, "Nível")
+        table.cell(panel, 1, 2, "EWZ")
+        table.cell(panel, 2, 2, "Dist. atual")
+        f_row(3, "Spot", spot, color.gray)
+        f_row(4, "Call Wall", callWall, color.orange)
+        f_row(5, "Put Wall", putWall, color.green)
+        f_row(6, "Gamma Flip", gammaFlip, color.yellow)
+        f_row(7, "Maior |GEX|", maxGex, color.aqua)
+        f_row(8, "Max Pain", maxPain, color.fuchsia)
+        f_row(9, "Expected −", emLow, color.blue)
+        f_row(10, "Expected +", emHigh, color.blue)
+
+// ============================================================================
+// 6) ALERTAS
+// ============================================================================
+groupAlerts = "4. Alertas"
+proximityPct = input.float(0.10, "Zona de proximidade (%)", minval = 0.01, maxval = 5.0, step = 0.01, group = groupAlerts)
+f_near(float level) => not na(level) and math.abs(close / level - 1.0) * 100.0 <= proximityPct
+
+nearAny = f_near(lCallWall) or f_near(lPutWall) or f_near(lFlip) or f_near(lMaxGex) or f_near(lMaxPain) or f_near(lEmLow) or f_near(lEmHigh)
+alertcondition(nearAny and not nearAny[1], "EWZ próximo de nível GEX", "O EWZ entrou na zona de proximidade de um nível exportado pelo Gamma Exposure.")
+alertcondition(ta.cross(close, lCallWall), "EWZ cruzou Call Wall", "O EWZ cruzou a Call Wall exportada.")
+alertcondition(ta.cross(close, lPutWall), "EWZ cruzou Put Wall", "O EWZ cruzou a Put Wall exportada.")
+alertcondition(ta.cross(close, lFlip), "EWZ cruzou Gamma Flip", "O EWZ cruzou o Gamma Flip exportado.")
+alertcondition(ta.cross(close, lMaxGex), "EWZ cruzou maior |GEX|", "O EWZ cruzou o strike de maior |GEX| exportado.")
+alertcondition(ta.cross(close, lMaxPain), "EWZ cruzou Max Pain", "O EWZ cruzou o Max Pain exportado.")
+alertcondition(ta.cross(close, lEmLow), "EWZ cruzou Expected Move −", "O EWZ cruzou o limite inferior do Expected Move exportado.")
+alertcondition(ta.cross(close, lEmHigh), "EWZ cruzou Expected Move +", "O EWZ cruzou o limite superior do Expected Move exportado.")

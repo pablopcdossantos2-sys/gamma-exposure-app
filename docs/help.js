@@ -159,6 +159,36 @@ var TOPICS={
     interpret:"Compare principalmente a forma, os strikes dominantes e a correlação entre os perfis. Divergência pode indicar atividade recente concentrada em regiões diferentes do estoque de OI.",
     caution:"Volume não é posição aberta e não deve ser somado ao OI. O proxy volume-weighted não identifica comprador/vendedor nem posição dealer real."
   },
+  "tv-review":{
+    title:"Indicadores de referência",
+    what:"Resume o que os indicadores anexados já faziam bem e onde eles divergem do modelo atual do Gamma Exposure.",
+    interpret:"Aproveitamos a experiência de uso — bloco colável, linhas, painel, alertas e fallback manual — mas substituímos níveis sem equivalente direto por métricas que realmente calculamos.",
+    caution:"Não atribua nomes como Call Wall 2, Gamma suporte ou Gamma resistência a níveis do nosso sistema sem uma definição matemática explícita."
+  },
+  "tv-generator":{
+    title:"Gerador EWZGEX2",
+    what:"Transforma o snapshot e o vencimento selecionados em uma única linha compacta, pronta para ser colada nos Inputs do indicador Pine.",
+    interpret:"O bloco contém os níveis EWZ e também as projeções WIN calculadas pela própria aplicação, além do timestamp e da referência de conversão.",
+    caution:"Ao trocar snapshot ou vencimento, gere e copie um novo bloco. O TradingView não consulta automaticamente os JSON do GitHub Pages."
+  },
+  "tv-indicators":{
+    title:"Indicadores TradingView",
+    what:"Há um indicador para o gráfico do EWZ e outro para o WIN. Ambos leem exatamente o mesmo bloco EWZGEX2.",
+    interpret:"Use o indicador EWZ para níveis originais e o indicador WIN para os níveis já projetados pelo dashboard.",
+    caution:"O indicador WIN não recalcula a projeção: isso é proposital para evitar divergência entre TradingView e a página."
+  },
+  "tv-install":{
+    title:"Instalação no TradingView",
+    what:"Explica como copiar o código Pine para o Editor Pine, adicionar o indicador ao gráfico e colar o bloco na janela Configurações → Inputs.",
+    interpret:"O código Pine é instalado uma vez; depois, normalmente basta atualizar o conteúdo do campo EWZGEX2 quando desejar novos níveis.",
+    caution:"Cole o bloco no campo de texto das configurações do indicador, não dentro do código Pine."
+  },
+  "tv-format":{
+    title:"Formato EWZGEX2",
+    what:"É o contrato de dados entre a aplicação e os scripts Pine: pares chave=valor separados por barras verticais.",
+    interpret:"As chaves EWZ representam níveis originais; chaves iniciadas por w representam os mesmos níveis projetados no WIN.",
+    caution:"Valores zero significam nível indisponível e são ignorados visualmente. Não altere nomes de chaves manualmente."
+  },
   "guide-delta":{
     title:"Delta",
     what:"Delta mede a sensibilidade do preço da opção a uma pequena variação do ativo e funciona também como aproximação de exposição direcional.",
