@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gex_core  # noqa: E402
+import validate_snapshot  # noqa: E402
 
 URL = "https://cdn.cboe.com/api/global/delayed_quotes/options/{sym}.json"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -225,6 +226,43 @@ def archive_snapshot(latest, outdir, now):
     return rel_file
 
 
+
+def _last_valid_metadata(outdir):
+    latest = _load_json(os.path.join(outdir, "latest.json"), {})
+    return {
+        "generated_at": latest.get("generated_at"),
+        "cboe_timestamp": latest.get("cboe_timestamp"),
+        "spot": latest.get("spot"),
+        "net_gex": latest.get("net_gex"),
+        "call_wall": latest.get("call_wall"),
+        "put_wall": latest.get("put_wall"),
+        "max_abs_strike": latest.get("max_abs_strike"),
+    }
+
+
+def write_collection_status(outdir, symbol, now, status, message=None, last_valid=None):
+    """Registra o resultado da tentativa sem substituir o último snapshot válido."""
+    last_valid = last_valid or {}
+    payload = {
+        "version": 1,
+        "symbol": symbol,
+        "source": "CBOE delayed option chain",
+        "attempted_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "status": status,
+        "message": (str(message)[:600] if message else None),
+        "last_valid_generated_at": last_valid.get("generated_at"),
+        "last_valid_cboe_timestamp": last_valid.get("cboe_timestamp"),
+        "last_valid_spot": last_valid.get("spot"),
+        "last_valid_net_gex": last_valid.get("net_gex"),
+        "last_valid_call_wall": last_valid.get("call_wall"),
+        "last_valid_put_wall": last_valid.get("put_wall"),
+        "last_valid_max_abs_strike": last_valid.get("max_abs_strike"),
+        "latest_updated": status == "success",
+    }
+    write_json(os.path.join(outdir, "collection-status.json"), payload)
+    return payload
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbol", default="EWZ")
@@ -235,70 +273,126 @@ def main():
     ap.add_argument("--rawdir", default=os.path.join(ROOT, "data", "raw"))
     a = ap.parse_args()
     symbol = a.symbol.upper()
-
-    raw = load_raw(a.from_raw) if a.from_raw else fetch_chain(symbol)
     now = datetime.now(timezone.utc)
-    stamp = now.strftime("%Y%m%d_%H%M%S")
+    previous = _last_valid_metadata(a.outdir)
 
-    raw_file = None
-    if a.save_raw and not a.from_raw:
-        os.makedirs(a.rawdir, exist_ok=True)
-        raw_file = f"{symbol}_{stamp}.json.gz"
-        with gzip.open(os.path.join(a.rawdir, raw_file), "wt", encoding="utf-8") as f:
-            json.dump(raw, f)
+    try:
+        raw = load_raw(a.from_raw) if a.from_raw else fetch_chain(symbol)
+        stamp = now.strftime("%Y%m%d_%H%M%S")
 
-    spot, contracts = gex_core.parse_chain(raw["data"], max_dte=a.max_dte)
-    _, activity_contracts = gex_core.parse_chain(raw["data"], max_dte=a.max_dte, include_zero_oi=True)
-    if not contracts:
-        raise RuntimeError("Chain vazia apos filtros.")
-    res = gex_core.compute(spot, contracts)
-    gex_core.merge_activity_metrics(res, activity_contracts)
-    expiry_profiles = gex_core.compute_expiry_profiles(spot, contracts, activity_contracts=activity_contracts)
-    term_structure = gex_core.compute_term_structure(expiry_profiles)
-    source_timestamp = raw["data"].get("timestamp") or raw.get("timestamp")
-    quality = assess_quality(raw["data"], contracts, now, source_timestamp=source_timestamp)
+        raw_file = None
+        if a.save_raw and not a.from_raw:
+            os.makedirs(a.rawdir, exist_ok=True)
+            raw_file = f"{symbol}_{stamp}.json.gz"
+            with gzip.open(os.path.join(a.rawdir, raw_file), "wt", encoding="utf-8") as f:
+                json.dump(raw, f)
 
-    latest = {
-        "symbol": symbol,
-        "demo": False,
-        "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "cboe_timestamp": raw["data"].get("timestamp") or raw.get("timestamp"),
-        "max_dte": a.max_dte,
-        "raw_file": raw_file,
-        "snapshot_version": 7,
-        "expiry_profiles": expiry_profiles,
-        "term_structure": term_structure,
-        "quality": quality,
-        **res,
-    }
-    write_json(os.path.join(a.outdir, "latest.json"), latest)
-    snapshot_file = archive_snapshot(latest, a.outdir, now)
+        if not isinstance(raw, dict) or not isinstance(raw.get("data"), dict):
+            raise RuntimeError("Resposta do CBOE sem objeto data válido.")
 
-    hist_path = os.path.join(a.outdir, "history.json")
-    hist = _load_json(hist_path, [])
-    hist = [h for h in hist if not h.get("demo") and h.get("t") != latest["generated_at"]]
-    hist.append({
-        "t": latest["generated_at"],
-        "spot": round(spot, 4),
-        "net_gex": round(res["net_gex"]),
-        "flip": None if res["flip"] is None else round(res["flip"], 4),
-        "call_wall": res["call_wall"],
-        "put_wall": res["put_wall"],
-        "max_abs": res["max_abs_strike"],
-    })
-    hist.sort(key=lambda h: h.get("t", ""))
-    write_json(hist_path, hist)
+        spot, contracts = gex_core.parse_chain(raw["data"], max_dte=a.max_dte)
+        _, activity_contracts = gex_core.parse_chain(
+            raw["data"], max_dte=a.max_dte, include_zero_oi=True
+        )
+        if not contracts:
+            raise RuntimeError("Chain vazia apos filtros.")
 
-    print(
-        f"{latest['generated_at']} {symbol} spot={spot:.2f} flip={res['flip']} "
-        f"call_wall={res['call_wall']} put_wall={res['put_wall']} "
-        f"contratos={res['n_contracts']} snapshot={snapshot_file}"
-    )
+        res = gex_core.compute(spot, contracts)
+        gex_core.merge_activity_metrics(res, activity_contracts)
+        expiry_profiles = gex_core.compute_expiry_profiles(
+            spot, contracts, activity_contracts=activity_contracts
+        )
+        term_structure = gex_core.compute_term_structure(expiry_profiles)
+        source_timestamp = raw["data"].get("timestamp") or raw.get("timestamp")
+        quality = assess_quality(
+            raw["data"], contracts, now, source_timestamp=source_timestamp
+        )
+
+        latest = {
+            "symbol": symbol,
+            "demo": False,
+            "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "cboe_timestamp": source_timestamp,
+            "max_dte": a.max_dte,
+            "raw_file": raw_file,
+            "snapshot_version": 8,
+            "expiry_profiles": expiry_profiles,
+            "term_structure": term_structure,
+            "quality": quality,
+            **res,
+        }
+
+        # Valida em memória ANTES de substituir latest.json ou criar snapshot.
+        validation_errors = validate_snapshot.validate_payload(latest)
+        if validation_errors:
+            raise RuntimeError(
+                "Snapshot rejeitado pela validacao: " + " | ".join(validation_errors[:8])
+            )
+
+        write_json(os.path.join(a.outdir, "latest.json"), latest)
+        snapshot_file = archive_snapshot(latest, a.outdir, now)
+
+        hist_path = os.path.join(a.outdir, "history.json")
+        hist = _load_json(hist_path, [])
+        hist = [
+            h for h in hist
+            if not h.get("demo") and h.get("t") != latest["generated_at"]
+        ]
+        hist.append({
+            "t": latest["generated_at"],
+            "spot": round(spot, 4),
+            "net_gex": round(res["net_gex"]),
+            "flip": None if res["flip"] is None else round(res["flip"], 4),
+            "call_wall": res["call_wall"],
+            "put_wall": res["put_wall"],
+            "max_abs": res["max_abs_strike"],
+        })
+        hist.sort(key=lambda h: h.get("t", ""))
+        write_json(hist_path, hist)
+
+        write_collection_status(
+            a.outdir,
+            symbol,
+            now,
+            "success",
+            message="Coleta validada e publicada.",
+            last_valid={
+                "generated_at": latest.get("generated_at"),
+                "cboe_timestamp": latest.get("cboe_timestamp"),
+                "spot": latest.get("spot"),
+                "net_gex": latest.get("net_gex"),
+                "call_wall": latest.get("call_wall"),
+                "put_wall": latest.get("put_wall"),
+                "max_abs_strike": latest.get("max_abs_strike"),
+            },
+        )
+
+        print(
+            f"{latest['generated_at']} {symbol} spot={spot:.2f} flip={res['flip']} "
+            f"call_wall={res['call_wall']} put_wall={res['put_wall']} "
+            f"contratos={res['n_contracts']} snapshot={snapshot_file}"
+        )
+        return 0
+
+    except Exception as exc:
+        # A falha ganha um arquivo próprio; latest.json permanece sendo o último
+        # snapshot real válido porque nenhuma escrita de mercado ocorre antes da validação.
+        write_collection_status(
+            a.outdir,
+            symbol,
+            now,
+            "failed",
+            message=f"{type(exc).__name__}: {exc}",
+            last_valid=previous,
+        )
+        raise
 
 
 if __name__ == "__main__":
     try:
-        main()
+        raise SystemExit(main())
+    except SystemExit:
+        raise
     except Exception as e:
         print("erro:", e, file=sys.stderr)
         sys.exit(1)
