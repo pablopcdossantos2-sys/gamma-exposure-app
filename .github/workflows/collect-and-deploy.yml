@@ -17,9 +17,9 @@ on:
   push:
     branches: [main]
     paths:
-      - "docs/index.html"
-      - "docs/app.js"
-      - "docs/style.css"
+      - "docs/*.html"
+      - "docs/*.js"
+      - "docs/*.css"
       - "collector/**"
       - ".github/workflows/**"
       - "README.md"
