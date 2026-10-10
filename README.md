@@ -19,7 +19,7 @@ nível WIN = nível EWZ × razão
 
 O valor é arredondado ao múltiplo de 5 mais próximo. A página também permite um ajuste manual opcional do WIN.
 
-A navegação também possui uma página **TradingView**. Nela, o usuário escolhe um snapshot e um vencimento e recebe um bloco `EWZGEX2` pronto para copiar. O mesmo bloco alimenta dois indicadores Pine Script v6 incluídos no projeto: um para os níveis originais do EWZ e outro para os níveis WIN já projetados pela própria aplicação. O export inclui Spot, Call Wall, Put Wall, Gamma Flip, maior `|GEX|`, Max Pain e Expected Move ±.
+A navegação também possui uma página **TradingView**. Nela, o usuário escolhe um snapshot e um vencimento e recebe um bloco `EWZGEX2` pronto para copiar. O indicador recomendado é **universal**: o mesmo Pine Script identifica automaticamente se o gráfico é EWZ ou WIN e seleciona, dentro do mesmo bloco, os níveis originais ou os níveis WIN já projetados pela aplicação. O export inclui Spot, Call Wall, Put Wall, Gamma Flip, maior `|GEX|`, Max Pain e Expected Move ±. Os indicadores dedicados de EWZ e WIN permanecem disponíveis apenas como alternativas.
 
 ## Heatmap, vencimentos e comparação histórica
 
@@ -224,8 +224,9 @@ docs/
   tradingview.html    gerador EWZGEX2 e tutorial TradingView
   tradingview.js      exportação dos níveis para Pine Script
   tradingview/
-    EWZ_GEX_EWZ_V2.pine
-    EWZ_GEX_WIN_V2.pine
+    EWZ_GEX_UNIVERSAL_V2.pine  indicador recomendado, adaptativo EWZ/WIN
+    EWZ_GEX_EWZ_V2.pine        alternativa dedicada ao EWZ
+    EWZ_GEX_WIN_V2.pine        alternativa dedicada ao WIN
   execucao-local.html tutorial web de execução local
   style.css
   data/

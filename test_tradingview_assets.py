@@ -10,6 +10,7 @@ class TradingViewAssetsTests(unittest.TestCase):
     def setUp(self):
         self.page = (DOCS / "tradingview.html").read_text(encoding="utf-8")
         self.js = (DOCS / "tradingview.js").read_text(encoding="utf-8")
+        self.universal = (DOCS / "tradingview" / "EWZ_GEX_UNIVERSAL_V2.pine").read_text(encoding="utf-8")
         self.ewz = (DOCS / "tradingview" / "EWZ_GEX_EWZ_V2.pine").read_text(encoding="utf-8")
         self.win = (DOCS / "tradingview" / "EWZ_GEX_WIN_V2.pine").read_text(encoding="utf-8")
 
@@ -18,6 +19,7 @@ class TradingViewAssetsTests(unittest.TestCase):
             'id="tvExportBlock"',
             'id="tvCopyBtn"',
             'id="tvExpirySelect"',
+            'tradingview/EWZ_GEX_UNIVERSAL_V2.pine',
             'tradingview/EWZ_GEX_EWZ_V2.pine',
             'tradingview/EWZ_GEX_WIN_V2.pine',
         ):
@@ -46,13 +48,26 @@ class TradingViewAssetsTests(unittest.TestCase):
             self.assertIn(key, self.js)
 
     def test_pine_scripts_use_v2_text_block(self):
-        for script in (self.ewz, self.win):
+        for script in (self.universal, self.ewz, self.win):
             self.assertIn("//@version=6", script)
             self.assertIn('input.text_area("", "Bloco EWZGEX2"', script)
             self.assertIn('str.startswith(appBlock, "EWZGEX2|")', script)
             self.assertNotIn("Call Wall 2", script)
             self.assertNotIn("Gamma resistência", script)
             self.assertNotIn("Gamma suporte", script)
+
+    def test_universal_indicator_detects_ewz_and_win(self):
+        self.assertIn('assetMode = input.string("Automático"', self.universal)
+        self.assertIn('tickerUpper == "EWZ"', self.universal)
+        self.assertIn('rootUpper == "WIN"', self.universal)
+        self.assertIn('str.startswith(tickerUpper, "WIN")', self.universal)
+        self.assertIn('"Forçar EWZ"', self.universal)
+        self.assertIn('"Forçar WIN"', self.universal)
+        for key in ("spot", "cw", "pw", "flip", "maxg", "pain", "emlo", "emhi"):
+            self.assertIn(f'f_blockFloat("{key}"', self.universal)
+        for key in ("wspot", "wcw", "wpw", "wflip", "wmaxg", "wpain", "wemlo", "wemhi"):
+            self.assertIn(f'f_blockFloat("{key}"', self.universal)
+        self.assertNotIn("request.security(", self.universal)
 
     def test_win_script_uses_exported_win_keys(self):
         for key in ("wspot", "wcw", "wpw", "wflip", "wmaxg", "wpain", "wemlo", "wemhi"):

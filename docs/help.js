@@ -172,15 +172,15 @@ var TOPICS={
     caution:"Ao trocar snapshot ou vencimento, gere e copie um novo bloco. O TradingView não consulta automaticamente os JSON do GitHub Pages."
   },
   "tv-indicators":{
-    title:"Indicadores TradingView",
-    what:"Há um indicador para o gráfico do EWZ e outro para o WIN. Ambos leem exatamente o mesmo bloco EWZGEX2.",
-    interpret:"Use o indicador EWZ para níveis originais e o indicador WIN para os níveis já projetados pelo dashboard.",
-    caution:"O indicador WIN não recalcula a projeção: isso é proposital para evitar divergência entre TradingView e a página."
+    title:"Indicador universal TradingView",
+    what:"O indicador recomendado é único: ele lê o mesmo EWZGEX2 e identifica automaticamente se o gráfico atual é EWZ ou WIN.",
+    interpret:"Em EWZ, usa as chaves originais; em WIN, usa as chaves w já projetadas pela aplicação. Há overrides Forçar EWZ/Forçar WIN para símbolos incomuns.",
+    caution:"Os scripts separados continuam disponíveis apenas como alternativas. O indicador universal não recalcula a projeção WIN; ele usa exatamente os valores exportados pelo dashboard."
   },
   "tv-install":{
     title:"Instalação no TradingView",
     what:"Explica como copiar o código Pine para o Editor Pine, adicionar o indicador ao gráfico e colar o bloco na janela Configurações → Inputs.",
-    interpret:"O código Pine é instalado uma vez; depois, normalmente basta atualizar o conteúdo do campo EWZGEX2 quando desejar novos níveis.",
+    interpret:"Instale o indicador universal uma vez; depois, normalmente basta atualizar o conteúdo do campo EWZGEX2. A troca entre EWZ e WIN é automática.",
     caution:"Cole o bloco no campo de texto das configurações do indicador, não dentro do código Pine."
   },
   "tv-format":{

@@ -1,0 +1,300 @@
+//@version=6
+indicator("Gamma Exposure · EWZ ↔ WIN · Universal V2", overlay = true, max_labels_count = 100)
+
+// ============================================================================
+// 1) BLOCO GERADO PELO GAMMA EXPOSURE
+// ============================================================================
+groupBridge = "1. Gamma Exposure App"
+inputMode = input.string("Bloco EWZGEX2", "Origem dos níveis", options = ["Bloco EWZGEX2", "Manual"], group = groupBridge)
+appBlock = input.text_area("", "Bloco EWZGEX2", group = groupBridge, tooltip = "Cole aqui o único bloco gerado pela página TradingView do Gamma Exposure. O mesmo bloco contém EWZ e WIN.")
+
+bool blockOk = str.startswith(appBlock, "EWZGEX2|")
+
+f_blockFloat(string key, float fallback) =>
+    float out = fallback
+    if blockOk
+        parts = str.split(appBlock, "|")
+        for i = 0 to array.size(parts) - 1
+            token = array.get(parts, i)
+            kv = str.split(token, "=")
+            if array.size(kv) >= 2 and array.get(kv, 0) == key
+                parsed = str.tonumber(array.get(kv, 1))
+                if not na(parsed)
+                    out := parsed
+    out
+
+f_blockString(string key, string fallback) =>
+    string out = fallback
+    if blockOk
+        parts = str.split(appBlock, "|")
+        for i = 0 to array.size(parts) - 1
+            token = array.get(parts, i)
+            kv = str.split(token, "=")
+            if array.size(kv) >= 2 and array.get(kv, 0) == key
+                out := array.get(kv, 1)
+    out
+
+// ============================================================================
+// 2) DETECÇÃO AUTOMÁTICA DO ATIVO
+// ============================================================================
+groupAsset = "2. Ativo"
+assetMode = input.string("Automático", "Seleção do ativo", options = ["Automático", "Forçar EWZ", "Forçar WIN"], group = groupAsset, tooltip = "Automático usa o ticker/raiz do gráfico. Use o override se o símbolo do seu fornecedor tiver nomenclatura incomum.")
+
+tickerUpper = str.upper(syminfo.ticker)
+rootUpper = str.upper(syminfo.root)
+
+bool detectedEWZ = tickerUpper == "EWZ"
+bool detectedWIN = rootUpper == "WIN" or str.startswith(tickerUpper, "WIN")
+
+string assetKind = assetMode == "Forçar EWZ" ? "EWZ" :
+     assetMode == "Forçar WIN" ? "WIN" :
+     detectedEWZ ? "EWZ" :
+     detectedWIN ? "WIN" : "OUTRO"
+
+bool isEWZ = assetKind == "EWZ"
+bool isWIN = assetKind == "WIN"
+bool assetSupported = isEWZ or isWIN
+
+// ============================================================================
+// 3) LEITURA DO BLOCO
+// ============================================================================
+ewzSpot = f_blockFloat("spot", 0.0)
+ewzCallWall = f_blockFloat("cw", 0.0)
+ewzPutWall = f_blockFloat("pw", 0.0)
+ewzFlip = f_blockFloat("flip", 0.0)
+ewzMaxGex = f_blockFloat("maxg", 0.0)
+ewzMaxPain = f_blockFloat("pain", 0.0)
+ewzEmLow = f_blockFloat("emlo", 0.0)
+ewzEmHigh = f_blockFloat("emhi", 0.0)
+
+winSpot = f_blockFloat("wspot", 0.0)
+winCallWall = f_blockFloat("wcw", 0.0)
+winPutWall = f_blockFloat("wpw", 0.0)
+winFlip = f_blockFloat("wflip", 0.0)
+winMaxGex = f_blockFloat("wmaxg", 0.0)
+winMaxPain = f_blockFloat("wpain", 0.0)
+winEmLow = f_blockFloat("wemlo", 0.0)
+winEmHigh = f_blockFloat("wemhi", 0.0)
+
+snapshotText = f_blockString("ts", "—")
+scopeText = f_blockString("scope", "—")
+structureExpiryText = f_blockString("structexp", "—")
+ratioText = f_blockString("ratio", "—")
+ratioTimeText = f_blockString("ratiots", "—")
+
+// ============================================================================
+// 4) FALLBACK MANUAL
+// ============================================================================
+groupManualEWZ = "3A. Manual · EWZ"
+mEwzSpot = input.float(0.0, "Spot", minval = 0.0, step = 0.01, group = groupManualEWZ)
+mEwzCallWall = input.float(0.0, "Call Wall", minval = 0.0, step = 0.01, group = groupManualEWZ)
+mEwzPutWall = input.float(0.0, "Put Wall", minval = 0.0, step = 0.01, group = groupManualEWZ)
+mEwzFlip = input.float(0.0, "Gamma Flip", minval = 0.0, step = 0.01, group = groupManualEWZ)
+mEwzMaxGex = input.float(0.0, "Maior |GEX|", minval = 0.0, step = 0.01, group = groupManualEWZ)
+mEwzMaxPain = input.float(0.0, "Max Pain", minval = 0.0, step = 0.01, group = groupManualEWZ)
+mEwzEmLow = input.float(0.0, "Expected Move −", minval = 0.0, step = 0.01, group = groupManualEWZ)
+mEwzEmHigh = input.float(0.0, "Expected Move +", minval = 0.0, step = 0.01, group = groupManualEWZ)
+
+groupManualWIN = "3B. Manual · WIN"
+mWinSpot = input.float(0.0, "Spot projetado", minval = 0.0, step = 5.0, group = groupManualWIN)
+mWinCallWall = input.float(0.0, "Call Wall", minval = 0.0, step = 5.0, group = groupManualWIN)
+mWinPutWall = input.float(0.0, "Put Wall", minval = 0.0, step = 5.0, group = groupManualWIN)
+mWinFlip = input.float(0.0, "Gamma Flip", minval = 0.0, step = 5.0, group = groupManualWIN)
+mWinMaxGex = input.float(0.0, "Maior |GEX|", minval = 0.0, step = 5.0, group = groupManualWIN)
+mWinMaxPain = input.float(0.0, "Max Pain", minval = 0.0, step = 5.0, group = groupManualWIN)
+mWinEmLow = input.float(0.0, "Expected Move −", minval = 0.0, step = 5.0, group = groupManualWIN)
+mWinEmHigh = input.float(0.0, "Expected Move +", minval = 0.0, step = 5.0, group = groupManualWIN)
+
+bool useBlock = inputMode == "Bloco EWZGEX2" and blockOk
+
+// Conjuntos EWZ efetivos.
+eSpot = useBlock ? ewzSpot : mEwzSpot
+eCallWall = useBlock ? ewzCallWall : mEwzCallWall
+ePutWall = useBlock ? ewzPutWall : mEwzPutWall
+eFlip = useBlock ? ewzFlip : mEwzFlip
+eMaxGex = useBlock ? ewzMaxGex : mEwzMaxGex
+eMaxPain = useBlock ? ewzMaxPain : mEwzMaxPain
+eEmLow = useBlock ? ewzEmLow : mEwzEmLow
+eEmHigh = useBlock ? ewzEmHigh : mEwzEmHigh
+
+// Conjuntos WIN efetivos.
+wSpot = useBlock ? winSpot : mWinSpot
+wCallWall = useBlock ? winCallWall : mWinCallWall
+wPutWall = useBlock ? winPutWall : mWinPutWall
+wFlip = useBlock ? winFlip : mWinFlip
+wMaxGex = useBlock ? winMaxGex : mWinMaxGex
+wMaxPain = useBlock ? winMaxPain : mWinMaxPain
+wEmLow = useBlock ? winEmLow : mWinEmLow
+wEmHigh = useBlock ? winEmHigh : mWinEmHigh
+
+// Seleção adaptativa conforme o ativo.
+spot = isWIN ? wSpot : isEWZ ? eSpot : na
+callWall = isWIN ? wCallWall : isEWZ ? eCallWall : na
+putWall = isWIN ? wPutWall : isEWZ ? ePutWall : na
+gammaFlip = isWIN ? wFlip : isEWZ ? eFlip : na
+maxGex = isWIN ? wMaxGex : isEWZ ? eMaxGex : na
+maxPain = isWIN ? wMaxPain : isEWZ ? eMaxPain : na
+emLow = isWIN ? wEmLow : isEWZ ? eEmLow : na
+emHigh = isWIN ? wEmHigh : isEWZ ? eEmHigh : na
+
+// ============================================================================
+// 5) VISUAL
+// ============================================================================
+groupVisual = "4. Visual"
+showSpot = input.bool(true, "Spot do snapshot", group = groupVisual)
+showCallWall = input.bool(true, "Call Wall", group = groupVisual)
+showPutWall = input.bool(true, "Put Wall", group = groupVisual)
+showFlip = input.bool(true, "Gamma Flip", group = groupVisual)
+showMaxGex = input.bool(true, "Maior |GEX|", group = groupVisual)
+showMaxPain = input.bool(true, "Max Pain", group = groupVisual)
+showExpectedMove = input.bool(true, "Expected Move ±", group = groupVisual)
+showFlipRegime = input.bool(true, "Destacar regime relativo ao Gamma Flip", group = groupVisual)
+showLabels = input.bool(true, "Mostrar rótulos", group = groupVisual)
+showTable = input.bool(true, "Mostrar painel", group = groupVisual)
+labelOffset = input.int(2, "Deslocamento dos rótulos", minval = 0, maxval = 50, group = groupVisual)
+recentOnly = input.bool(true, "Exibir somente barras recentes", group = groupVisual, tooltip = "Evita a impressão de que os níveis do snapshot atual existiam em todo o histórico.")
+recentDays = input.int(3, "Dias corridos exibidos", minval = 1, maxval = 30, group = groupVisual)
+
+bool inWindow = not recentOnly or time >= timenow - recentDays * 24 * 60 * 60 * 1000
+f_valid(float x) => not na(x) and x > 0
+f_level(bool enabled, float x) => enabled and assetSupported and inWindow and f_valid(x) ? x : na
+
+lSpot = f_level(showSpot, spot)
+lCallWall = f_level(showCallWall, callWall)
+lPutWall = f_level(showPutWall, putWall)
+lFlip = f_level(showFlip, gammaFlip)
+lMaxGex = f_level(showMaxGex, maxGex)
+lMaxPain = f_level(showMaxPain, maxPain)
+lEmLow = f_level(showExpectedMove, emLow)
+lEmHigh = f_level(showExpectedMove, emHigh)
+
+plot(lSpot, "GEX · Spot do snapshot", color = color.new(color.gray, 20), linewidth = 1, style = plot.style_linebr)
+plot(lCallWall, "GEX · Call Wall", color = color.orange, linewidth = 3, style = plot.style_linebr)
+plot(lPutWall, "GEX · Put Wall", color = color.green, linewidth = 3, style = plot.style_linebr)
+plot(lFlip, "GEX · Gamma Flip", color = color.yellow, linewidth = 3, style = plot.style_linebr)
+plot(lMaxGex, "GEX · Maior |GEX|", color = color.aqua, linewidth = 2, style = plot.style_linebr)
+plot(lMaxPain, "GEX · Max Pain", color = color.fuchsia, linewidth = 2, style = plot.style_linebr)
+plot(lEmLow, "GEX · Expected Move −", color = color.new(color.blue, 25), linewidth = 2, style = plot.style_linebr)
+plot(lEmHigh, "GEX · Expected Move +", color = color.new(color.blue, 25), linewidth = 2, style = plot.style_linebr)
+
+bgcolor(showFlipRegime and assetSupported and not na(lFlip) ? close >= lFlip ? color.new(color.green, 93) : color.new(color.red, 93) : na, title = "Regime relativo ao Gamma Flip")
+bgcolor(not assetSupported ? color.new(color.orange, 90) : na, title = "Ativo não reconhecido")
+
+// ============================================================================
+// 6) RÓTULOS
+// ============================================================================
+f_label(label id, float y, float ewzLevel, float winLevel, string name, color c) =>
+    label out = id
+    if barstate.islast
+        if showLabels and not na(y)
+            string currentTxt = assetKind + " " + str.tostring(y, format.mintick)
+            string originTxt = isWIN and f_valid(ewzLevel) ? " · EWZ " + str.tostring(ewzLevel, "#.##") : ""
+            string projectedTxt = isEWZ and f_valid(winLevel) ? " · WIN " + str.tostring(winLevel, "#") : ""
+            string txt = name + " · " + currentTxt + originTxt + projectedTxt
+            if na(out)
+                out := label.new(bar_index + labelOffset, y, txt, xloc = xloc.bar_index, style = label.style_label_left, color = color.new(c, 10), textcolor = color.white, size = size.small)
+            else
+                label.set_xy(out, bar_index + labelOffset, y)
+                label.set_text(out, txt)
+                label.set_color(out, color.new(c, 10))
+                label.set_textcolor(out, color.white)
+        else
+            if not na(out)
+                label.delete(out)
+            out := na
+    out
+
+var label lbSpot = na
+var label lbCw = na
+var label lbPw = na
+var label lbFlip = na
+var label lbMax = na
+var label lbPain = na
+var label lbLo = na
+var label lbHi = na
+
+lbSpot := f_label(lbSpot, lSpot, eSpot, wSpot, "Spot", color.gray)
+lbCw := f_label(lbCw, lCallWall, eCallWall, wCallWall, "Call Wall", color.orange)
+lbPw := f_label(lbPw, lPutWall, ePutWall, wPutWall, "Put Wall", color.green)
+lbFlip := f_label(lbFlip, lFlip, eFlip, wFlip, "Gamma Flip", color.yellow)
+lbMax := f_label(lbMax, lMaxGex, eMaxGex, wMaxGex, "Maior |GEX|", color.aqua)
+lbPain := f_label(lbPain, lMaxPain, eMaxPain, wMaxPain, "Max Pain", color.fuchsia)
+lbLo := f_label(lbLo, lEmLow, eEmLow, wEmLow, "Expected Move −", color.blue)
+lbHi := f_label(lbHi, lEmHigh, eEmHigh, wEmHigh, "Expected Move +", color.blue)
+
+// ============================================================================
+// 7) PAINEL
+// ============================================================================
+f_fmtEwz(float x) => f_valid(x) ? str.tostring(x, "#.##") : "—"
+f_fmtWin(float x) => f_valid(x) ? str.tostring(x, "#") : "—"
+f_fmtCurrent(float x) => f_valid(x) ? str.tostring(x, format.mintick) : "—"
+f_dist(float x) => f_valid(x) ? str.tostring((close / x - 1.0) * 100.0, "#.##") + "%" : "—"
+
+var table panel = table.new(position.top_right, 5, 13, border_width = 1)
+
+f_row(int row, string name, float ewz, float win, float current, color c) =>
+    table.cell(panel, 0, row, name, text_color = c)
+    table.cell(panel, 1, row, f_fmtEwz(ewz))
+    table.cell(panel, 2, row, f_fmtWin(win))
+    table.cell(panel, 3, row, f_fmtCurrent(current))
+    table.cell(panel, 4, row, f_dist(current))
+
+if barstate.islast
+    table.clear(panel, 0, 0, 4, 12)
+    if showTable
+        table.cell(panel, 0, 0, "EWZGEX2")
+        table.cell(panel, 1, 0, useBlock ? "bloco OK" : "manual")
+        table.cell(panel, 2, 0, "Ativo")
+        table.cell(panel, 3, 0, assetKind)
+        table.cell(panel, 4, 0, assetMode)
+
+        table.cell(panel, 0, 1, "Snapshot")
+        table.cell(panel, 1, 1, snapshotText)
+        table.cell(panel, 2, 1, "Escopo")
+        table.cell(panel, 3, 1, scopeText)
+        table.cell(panel, 4, 1, structureExpiryText)
+
+        table.cell(panel, 0, 2, "Nível")
+        table.cell(panel, 1, 2, "EWZ")
+        table.cell(panel, 2, 2, "WIN")
+        table.cell(panel, 3, 2, "Atual")
+        table.cell(panel, 4, 2, "Dist.")
+
+        f_row(3, "Spot", eSpot, wSpot, spot, color.gray)
+        f_row(4, "Call Wall", eCallWall, wCallWall, callWall, color.orange)
+        f_row(5, "Put Wall", ePutWall, wPutWall, putWall, color.green)
+        f_row(6, "Gamma Flip", eFlip, wFlip, gammaFlip, color.yellow)
+        f_row(7, "Maior |GEX|", eMaxGex, wMaxGex, maxGex, color.aqua)
+        f_row(8, "Max Pain", eMaxPain, wMaxPain, maxPain, color.fuchsia)
+        f_row(9, "Expected −", eEmLow, wEmLow, emLow, color.blue)
+        f_row(10, "Expected +", eEmHigh, wEmHigh, emHigh, color.blue)
+
+        table.cell(panel, 0, 11, "Razão")
+        table.cell(panel, 1, 11, ratioText)
+        table.cell(panel, 2, 11, "Ref.")
+        table.cell(panel, 3, 11, ratioTimeText)
+        table.cell(panel, 4, 11, assetSupported ? "OK" : "NÃO SUPORTADO")
+
+        table.cell(panel, 0, 12, "Ticker")
+        table.cell(panel, 1, 12, syminfo.ticker)
+        table.cell(panel, 2, 12, "Raiz")
+        table.cell(panel, 3, 12, syminfo.root)
+        table.cell(panel, 4, 12, not assetSupported ? "Use override" : "")
+
+// ============================================================================
+// 8) ALERTAS
+// ============================================================================
+groupAlerts = "5. Alertas"
+proximityPct = input.float(0.10, "Zona de proximidade (%)", minval = 0.01, maxval = 5.0, step = 0.01, group = groupAlerts)
+f_near(float level) => not na(level) and math.abs(close / level - 1.0) * 100.0 <= proximityPct
+
+nearAny = f_near(lCallWall) or f_near(lPutWall) or f_near(lFlip) or f_near(lMaxGex) or f_near(lMaxPain) or f_near(lEmLow) or f_near(lEmHigh)
+
+alertcondition(nearAny and not nearAny[1], "Próximo de nível GEX", "O ativo atual entrou na zona de proximidade de um nível GEX exportado.")
+alertcondition(ta.cross(close, lCallWall), "Cruzou Call Wall", "O ativo atual cruzou a Call Wall.")
+alertcondition(ta.cross(close, lPutWall), "Cruzou Put Wall", "O ativo atual cruzou a Put Wall.")
+alertcondition(ta.cross(close, lFlip), "Cruzou Gamma Flip", "O ativo atual cruzou o Gamma Flip.")
+alertcondition(ta.cross(close, lMaxGex), "Cruzou maior |GEX|", "O ativo atual cruzou o nível de maior |GEX|.")
+alertcondition(ta.cross(close, lMaxPain), "Cruzou Max Pain", "O ativo atual cruzou o Max Pain.")
+alertcondition(ta.cross(close, lEmLow), "Cruzou Expected Move −", "O ativo atual cruzou o limite inferior do Expected Move.")
+alertcondition(ta.cross(close, lEmHigh), "Cruzou Expected Move +", "O ativo atual cruzou o limite superior do Expected Move.")
