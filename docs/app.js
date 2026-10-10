@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 var NS="http://www.w3.org/2000/svg",WIN_TICK=5;
-var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null,oiCache:{},oiLoading:null,stressScenario:null,receipts:[],scorecard:null,analysisDayCache:{},volumeBaselineCache:{},smoothEnabled:false,smoothSpeed:"medium"};
+var state={gex:null,liveLatest:null,prices:null,snapshotIndex:null,collectionStatus:null,selectedSnapshot:null,range:.15,expiryFilter:"all",manualWin:null,viewMode:"levels",zoneCount:7,zoneOpacity:"medium",advancedMetric:"dex",advancedOverlay:"none",chartViews:{ewz:null,win:null},compareA:null,compareB:null,timeMapCache:{},timeMapLoading:null,oiCache:{},oiLoading:null,stressScenario:null,receipts:[],scorecard:null,analysisDayCache:{},volumeBaselineCache:{},smoothEnabled:false,smoothSpeed:"medium"};
 var dragState=null,dragRAF=null;
 var fmt0=new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
 var fmt2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -469,8 +469,9 @@ function renderQuality(){
   if(p&&p.errors&&p.errors.length)priceIssues=priceIssues.concat(p.errors);
   if(p&&p.ewz&&p.ewz.stale)priceIssues.push("EWZ com candles anteriores");
   if(p&&p.win&&p.win.stale)priceIssues.push("WIN com candles anteriores");
+  var collectionFailed=state.collectionStatus&&state.collectionStatus.status==="failed";
   var severity=q.status||"ok";
-  if(priceIssues.length&&severity==="ok")severity="warning";
+  if((priceIssues.length||collectionFailed)&&severity==="ok")severity="warning";
   status.className="quality-status "+severity;
   status.textContent=severity==="critical"?"Crítico":severity==="warning"?"Atenção":"OK";
   var cards=[
@@ -485,6 +486,10 @@ function renderQuality(){
   ];
   cards.forEach(function(m){var d=document.createElement("div");d.className="quality-metric";var a=document.createElement("span");a.textContent=m[0];var b=document.createElement("strong");b.textContent=m[1];var s=document.createElement("small");s.textContent=m[2];d.appendChild(a);d.appendChild(b);d.appendChild(s);box.appendChild(d)});
   var all=(q.flags||[]).map(qualityFlagLabel).concat(priceIssues);
+  if(collectionFailed){
+    var attempted=state.collectionStatus.attempted_at?new Date(state.collectionStatus.attempted_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"horário desconhecido";
+    all.push("Última tentativa de coleta GEX falhou ("+attempted+"); exibindo o último snapshot válido.")
+  }
   if(!all.length){flags.innerHTML='<span class="quality-chip ok">Nenhuma flag técnica nesta coleta</span>'}
   else all.forEach(function(x){var s=document.createElement("span");s.className="quality-chip "+(severity==="critical"?"critical":"warning");s.textContent=x;flags.appendChild(s)})
 }
@@ -1247,12 +1252,20 @@ function init(){
   Promise.all([
     getJson("data/latest.json"),
     getJson("data/prices.json").catch(function(){return null}),
-    getJson("data/gex-snapshots/index.json").catch(function(){return {snapshots:[]}})
+    getJson("data/gex-snapshots/index.json").catch(function(){return {snapshots:[]}}),
+    getJson("data/collection-status.json").catch(function(){return null})
   ]).then(function(r){
-    state.liveLatest=r[0];state.gex=r[0];state.prices=r[1];state.snapshotIndex=r[2];
+    state.liveLatest=r[0];state.gex=r[0];state.prices=r[1];state.snapshotIndex=r[2];state.collectionStatus=r[3];
     state.selectedSnapshot=snapshotEntries().find(function(s){return s.generated_at===state.gex.generated_at})||null;
     renderAll();
-    if(state.prices&&state.prices.errors&&state.prices.errors.length){var b=$("errorBanner");b.hidden=false;b.textContent="Aviso na coleta de preços: "+state.prices.errors.join(" · ")}
+    var warnings=[];
+    if(state.collectionStatus&&state.collectionStatus.status==="failed"){
+      var a=state.collectionStatus.attempted_at?new Date(state.collectionStatus.attempted_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"horário desconhecido";
+      var lv=state.collectionStatus.last_valid_generated_at?new Date(state.collectionStatus.last_valid_generated_at).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"snapshot anterior";
+      warnings.push("A última tentativa de atualizar o GEX falhou em "+a+". Exibindo o último snapshot real válido ("+lv+")."+(state.collectionStatus.message?" Motivo: "+state.collectionStatus.message:""))
+    }
+    if(state.prices&&state.prices.errors&&state.prices.errors.length)warnings.push("Aviso na coleta de preços: "+state.prices.errors.join(" · "));
+    if(warnings.length){var b=$("errorBanner");b.hidden=false;b.textContent=warnings.join(" · ")}
   }).catch(function(err){$("status").textContent="Não foi possível carregar o dashboard.";var b=$("errorBanner");b.hidden=false;b.textContent=err.message})
 }
 init();
