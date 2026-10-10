@@ -77,6 +77,10 @@ jobs:
           if [ -n "$MAX_DTE" ]; then ARGS="$ARGS --max-dte $MAX_DTE"; fi
           python collector/collect.py --symbol "$SYMBOL" $ARGS
 
+      - name: Validar snapshot GEX antes de publicar
+        if: steps.collect_gex.outcome == 'success'
+        run: python collector/validate_snapshot.py docs/data/latest.json
+
       - name: Coletar candles de EWZ e WIN1!
         id: collect_prices
         continue-on-error: true
